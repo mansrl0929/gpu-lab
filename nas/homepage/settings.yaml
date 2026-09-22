@@ -1,0 +1,10 @@
+title: GPU LAB
+description: 연구실 GPU 예약 · 모니터링
+theme: light
+color: slate
+language: ko
+headerStyle: clean
+layout:
+  연구실 GPU:
+    style: row
+    columns: 3

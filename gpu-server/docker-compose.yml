@@ -1,0 +1,9 @@
+name: gpu-lab-exporters
+services:
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.0-4.8.3-distroless
+    restart: unless-stopped
+    gpus: all
+    cap_add: [SYS_ADMIN]
+    # Host networking makes Linux INPUT firewall rules apply to port 9400.
+    network_mode: host

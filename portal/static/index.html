@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f6f7f9"><title>GPU LAB · 연구실 GPU 예약</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%234e5be8'/%3E%3Cpath d='M12 12h16v16H12z' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E"><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<body>
+<div id="auth-screen" hidden>
+  <div class="auth-card">
+    <div class="auth-brand"><span class="brand-icon">▦</span><span>GPU<span class="brand-light"> LAB</span><small>RESEARCH WORKSPACE</small></span></div>
+    <h1 id="auth-title">연구실 GPU 예약</h1>
+    <p id="auth-subtitle">계정으로 로그인하면 GPU 예약과 실시간 사용 현황을 확인할 수 있습니다.</p>
+    <div class="tabs auth-tabs"><button type="button" data-auth-tab="login" class="selected">로그인</button><button type="button" data-auth-tab="signup">회원가입</button></div>
+    <form id="login-form" class="auth-form" autocomplete="on">
+      <label>아이디<input name="username" autocomplete="username" required maxlength="64" placeholder="예: kimminsu"></label>
+      <label>비밀번호<input type="password" name="password" autocomplete="current-password" required maxlength="128"></label>
+      <div class="form-error" id="login-error" role="alert"></div>
+      <button class="button primary" type="submit">로그인</button>
+    </form>
+    <form id="signup-form" class="auth-form" autocomplete="on" hidden>
+      <label>아이디<input name="username" autocomplete="username" required maxlength="32" placeholder="영문 소문자·숫자 3~32자"></label>
+      <label>사용자 이름<input name="display_name" autocomplete="name" required maxlength="40" placeholder="예: 김민수"></label>
+      <label>비밀번호<input type="password" name="password" autocomplete="new-password" required minlength="8" maxlength="128" placeholder="8자 이상"></label>
+      <label>연구실 가입 코드<input name="code" required maxlength="200" placeholder="관리자에게 받은 코드"></label>
+      <div class="form-error" id="signup-error" role="alert"></div>
+      <button class="button primary" type="submit">가입하고 시작하기</button>
+    </form>
+    <p class="auth-note">예약은 우선 사용권입니다. 이 시스템은 GPU 권한을 바꾸거나 실행 중인 작업을 종료하지 않습니다.</p>
+  </div>
+</div>
+<aside class="sidebar">
+  <a class="brand" href="#overview"><span class="brand-icon">▦</span><span>GPU<span class="brand-light"> LAB</span><small>RESEARCH WORKSPACE</small></span></a>
+  <div class="workspace"><span class="workspace-icon">R</span><div>연구실 워크스페이스<small>Shared computing, together.</small></div><span class="chevron">⌄</span></div>
+  <div class="nav-caption">WORKSPACE</div>
+  <nav aria-label="주 메뉴">
+    <a href="#overview" data-page="overview"><span>▦</span>대시보드</a>
+    <a href="#reservations" data-page="reservations"><span>▤</span>예약 캘린더</a>
+    <a href="#monitoring" data-page="monitoring"><span>⌁</span>사용량 모니터링</a>
+    <a href="#reports" data-page="reports"><span>◎</span>운영 리포트</a>
+    <a href="#mine" data-page="mine"><span>▣</span>내 예약</a>
+  </nav>
+  <div class="nav-caption second">LAB GUIDE</div>
+  <nav aria-label="도움말"><a href="#guide" data-page="guide"><span>ⓘ</span>이용 가이드</a><a href="#connections" data-page="connections"><span>⚙</span>서비스 연결</a></nav>
+  <div class="sidebar-bottom"><div class="soft-card"><span class="soft-icon">◇</span><strong>함께 쓰는 GPU, 유연하게.</strong><p>예약은 우선 사용권입니다.<br>유휴 자원은 함께 활용하세요.</p><a href="#guide">Soft Reservation 알아보기 ↗</a></div><div class="profile"><span class="avatar" id="profile-avatar">·</span><div id="profile-name">불러오는 중<small>&nbsp;</small></div><button class="icon-button" id="logout-button" aria-label="로그아웃" title="로그아웃" hidden>⏻</button><span class="profile-dot"></span></div></div>
+</aside>
+<div class="shell">
+  <header class="topbar"><div class="breadcrumb">워크스페이스 <span>/</span> <strong id="crumb">대시보드</strong></div><div class="top-actions"><span id="mode-badge" class="mode">DEMO WORKSPACE</span><span class="timezone">◷ Asia/Seoul</span><button class="icon-button" id="notification-button" aria-label="상태 알림 보기">♧<i id="alert-dot"></i></button></div></header>
+  <main>
+    <div id="connection-error" class="error-banner" role="alert" hidden></div>
+    <div class="page-heading"><div><div class="eyebrow">YOUR RESEARCH, WITHOUT THE WAIT.</div><h1 id="page-title">연구를 위한 자원, 한눈에.</h1><p id="page-subtitle">GPU 사용 현황을 확인하고, 다음 실험을 위한 시간을 예약하세요.</p></div><button class="button primary" id="new-reservation"><span>＋</span> 새 예약 만들기</button></div>
+    <div id="demo-banner" class="demo-banner"><span>◈</span><div><strong>데모 워크스페이스</strong><span> 예시 장비·사용량입니다. 예약을 직접 만들어볼 수 있으며 실제 GPU에는 영향을 주지 않습니다.</span></div><a href="#connections">연동 안내 ↗</a></div>
+    <div id="content"><div class="loading">워크스페이스를 불러오는 중입니다…</div></div>
+    <footer><span><span class="live-dot"></span> <span id="refresh-status">30초마다 자동 업데이트</span></span><span>Soft Reservation · No enforcement <span class="footer-divider">|</span> GPU LAB</span></footer>
+  </main>
+</div>
+<dialog id="reservation-dialog" aria-labelledby="dialog-title"><form id="reservation-form"><div class="dialog-head"><div><span class="eyebrow">PLAN YOUR NEXT EXPERIMENT</span><h2 id="dialog-title">새 GPU 예약</h2></div><button type="button" class="icon-button close-dialog" aria-label="닫기">✕</button></div><p class="form-intro" id="form-owner">우선 사용 시간을 등록합니다.</p><input type="hidden" name="id"><div class="form-grid"><label class="full">작업 제목 <span>*</span><input name="title" required maxlength="120" placeholder="예: RoMa 모델 학습"></label><label class="full">프로젝트 / 목적 <span>*</span><input name="project" required maxlength="120" placeholder="예: Sea Ice Drift"></label><fieldset class="full"><legend>GPU 선택 <span>*</span> <small>여러 장을 동시에 선택할 수 있어요</small></legend><div id="gpu-options"></div></fieldset><label>시작 시각 (KST)<input type="datetime-local" name="start" required></label><label>종료 시각 (KST)<input type="datetime-local" name="end" required></label><label>예상 CPU 코어<input type="number" name="cpu_cores" min="0" max="4096" value="0"></label><label>예상 RAM (GB)<input type="number" name="ram_gb" min="0" max="65536" value="0"></label><label class="full">작업 유형<select name="job_type"><option>Training</option><option>Inference</option><option>Preprocess</option></select></label><label class="full">메모 / 장기 사용 사유<textarea name="note" maxlength="2000" rows="2" placeholder="48시간 초과 예약은 사유를 입력하세요."></textarea></label></div><div class="form-notice">ⓘ 예약은 우선 사용권이며, GPU·CPU·RAM을 강제로 할당하지 않습니다.</div><div id="form-error" class="form-error" role="alert"></div><div class="dialog-actions"><button type="button" class="button close-dialog">취소</button><button type="submit" class="button primary">예약 저장</button></div></form></dialog>
+<dialog id="detail-dialog" aria-labelledby="detail-title"><div id="detail-content"></div></dialog>
+<div id="toast" role="status" hidden></div>
+</body></html>

@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+*.env
+data/
+artifacts/
+*.sqlite3
+!.env.example
+!*.env.example
+# Accounts, sessions and the signup code never leave this machine.
+data/portal.sqlite3
+data/signup_code.txt
+*.sqlite3-wal
+*.sqlite3-shm

@@ -1,0 +1,14 @@
+[Unit]
+Description=Read-only GPU process metrics for node_exporter
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/gpu-lab/process_collector.py
+User=root
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/prometheus/node-exporter
+PrivateTmp=true
+TimeoutStartSec=45

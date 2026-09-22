@@ -1,0 +1,4 @@
+* * * * * php /var/www/html/Jobs/sendreminders.php
+* * * * * php /var/www/html/Jobs/sendwaitlist.php
+0 0 * * * php /var/www/html/Jobs/sendseriesend.php
+0 0 * * * php /var/www/html/Jobs/sessioncleanup.php

@@ -1,0 +1,14 @@
+- 연구실 GPU:
+    - GPU 예약 · 통합 대시보드:
+        href: http://{{HOMEPAGE_VAR_NAS_HOST}}:8000
+        description: 예약 생성과 실제 GPU 상태 · 대여 가능 여부
+        icon: mdi-view-dashboard-outline
+    - GPU 모니터링:
+        href: http://{{HOMEPAGE_VAR_NAS_HOST}}:3001
+        description: Grafana · CPU / RAM / Disk / GPU 상세
+        icon: grafana.svg
+# LibreBooking을 함께 쓸 때만 아래 카드를 사용합니다 (docker compose --profile librebooking).
+#    - GPU 예약 (LibreBooking):
+#        href: http://{{HOMEPAGE_VAR_NAS_HOST}}:8080/Web
+#        description: 외부 예약 시스템
+#        icon: mdi-calendar-clock

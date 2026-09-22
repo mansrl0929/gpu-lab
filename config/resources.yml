@@ -1,0 +1,19 @@
+# Replace IDs and hardware with the resources registered in LibreBooking.
+servers:
+  - id: gpu-server-1
+    name: Workstation 01
+    description: 딥러닝 · 멀티 GPU 학습
+  - id: gpu-server-2
+    name: Workstation 02
+    description: 추론 · 실험 · 데이터 전처리
+resources:
+  - {id: S1-GPU0, librebooking_resource_id: 1, server: gpu-server-1, gpu_index: '0', model: NVIDIA RTX 4090, vram_gb: 24}
+  - {id: S1-GPU1, librebooking_resource_id: 2, server: gpu-server-1, gpu_index: '1', model: NVIDIA RTX 4090, vram_gb: 24}
+  - {id: S1-GPU2, librebooking_resource_id: 3, server: gpu-server-1, gpu_index: '2', model: NVIDIA RTX 4090, vram_gb: 24}
+  - {id: S1-GPU3, librebooking_resource_id: 4, server: gpu-server-1, gpu_index: '3', model: NVIDIA RTX 4090, vram_gb: 24}
+  - {id: S2-GPU0, librebooking_resource_id: 5, server: gpu-server-2, gpu_index: '0', model: NVIDIA RTX 3090, vram_gb: 24}
+  - {id: S2-GPU1, librebooking_resource_id: 6, server: gpu-server-2, gpu_index: '1', model: NVIDIA RTX 3090, vram_gb: 24}
+users:
+  - {librebooking_user_id: 1, linux_username: student1, display_name: 김민수}
+  - {librebooking_user_id: 2, linux_username: student2, display_name: 이서연}
+  - {librebooking_user_id: 3, linux_username: student3, display_name: 박지훈}

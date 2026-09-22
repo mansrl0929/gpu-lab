@@ -1,0 +1,10 @@
+[Unit]
+Description=Collect GPU process owners every 30 seconds
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=30
+AccuracySec=1
+
+[Install]
+WantedBy=timers.target

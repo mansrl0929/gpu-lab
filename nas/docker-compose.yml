@@ -1,0 +1,116 @@
+name: gpu-lab
+services:
+  librebooking-db:
+    image: linuxserver/mariadb:10.6.13
+    profiles: [librebooking]
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-change-me}
+      MYSQL_DATABASE: librebooking
+      MYSQL_USER: lb_user
+      MYSQL_PASSWORD: ${DB_PASSWORD:-change-me}
+    volumes:
+      - librebooking-db:/config
+  librebooking:
+    image: librebooking/librebooking:${LIBREBOOKING_TAG:-develop}
+    profiles: [librebooking]
+    restart: unless-stopped
+    depends_on: [librebooking-db]
+    ports: ['${NAS_BIND_IP:-127.0.0.1}:8080:8080']
+    environment: &lb-env
+      LB_INSTALL_PASSWORD: ${LB_INSTALL_PASSWORD:-change-me}
+      LB_DATABASE_PASSWORD: ${DB_PASSWORD:-change-me}
+      LB_DATABASE_NAME: librebooking
+      LB_DATABASE_USER: lb_user
+      LB_DATABASE_HOSTSPEC: librebooking-db
+      LB_LOGGING_FOLDER: /var/log/librebooking
+      LB_LOGGING_LEVEL: ERROR
+      LB_LOGGING_SQL: 'false'
+      LB_DEFAULT_TIMEZONE: Asia/Seoul
+      LB_SCRIPT_URL: http://${NAS_PUBLIC_HOST:?Set NAS_PUBLIC_HOST}:8080/Web
+    volumes:
+      - librebooking-app:/config
+      - librebooking-images:/var/www/html/Web/uploads/images
+      - librebooking-reservations:/var/www/html/Web/uploads/reservation
+      - ./librebooking/crontab:/config/lb-jobs-cron:ro
+  librebooking-cron:
+    image: librebooking/librebooking:${LIBREBOOKING_TAG:-develop}
+    profiles: [librebooking]
+    restart: unless-stopped
+    depends_on: [librebooking]
+    environment: *lb-env
+    command: supercronic /config/lb-jobs-cron
+    volumes_from: [librebooking]
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_TAG:?Set PROMETHEUS_TAG}
+    restart: unless-stopped
+    ports: ['127.0.0.1:9090:9090']
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --storage.tsdb.retention.size=10GB
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - prometheus:/prometheus
+  grafana:
+    image: grafana/grafana:${GRAFANA_TAG:?Set GRAFANA_TAG}
+    restart: unless-stopped
+    depends_on: [prometheus]
+    ports: ['${NAS_BIND_IP:-127.0.0.1}:3001:3000']
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-labadmin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+    volumes:
+      - grafana:/var/lib/grafana
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+  homepage:
+    image: ghcr.io/gethomepage/homepage:${HOMEPAGE_TAG:?Set HOMEPAGE_TAG}
+    restart: unless-stopped
+    ports: ['${NAS_BIND_IP:-127.0.0.1}:3000:3000']
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS:?Set HOMEPAGE_ALLOWED_HOSTS}
+      HOMEPAGE_VAR_NAS_HOST: ${NAS_PUBLIC_HOST}
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+    volumes:
+      - ./homepage:/app/config
+  portal:
+    build: ..
+    restart: unless-stopped
+    depends_on: [prometheus]
+    ports: ['${NAS_BIND_IP:-127.0.0.1}:8000:8000']
+    environment:
+      # standalone: the portal keeps accounts and reservations. Use live only with the librebooking profile.
+      PORTAL_MODE: ${PORTAL_MODE:-standalone}
+      PORTAL_SIGNUP_CODE: ${PORTAL_SIGNUP_CODE:?Set PORTAL_SIGNUP_CODE}
+      PORTAL_DB: /app/data/portal.sqlite3
+      # Set to 1 when the portal is served over HTTPS (public or reverse-proxied).
+      PORTAL_SECURE_COOKIES: ${PORTAL_SECURE_COOKIES:-0}
+      RESOURCE_MAPPING: /app/config/resources.yml
+      PROMETHEUS_URL: http://prometheus:9090
+      LIBREBOOKING_API_URL: http://librebooking:8080/Web/Services/index.php
+      LIBREBOOKING_USERNAME: ${LIBREBOOKING_USERNAME:-}
+      LIBREBOOKING_PASSWORD: ${LIBREBOOKING_PASSWORD:-}
+      LIBREBOOKING_PUBLIC_URL: http://${NAS_PUBLIC_HOST}:8080/Web
+      GRAFANA_PUBLIC_URL: http://${NAS_PUBLIC_HOST}:3001
+      HOMEPAGE_PUBLIC_URL: http://${NAS_PUBLIC_HOST}:3000
+      # Keep in sync with the Prometheus retention flag above; shown in the operating report.
+      PROMETHEUS_RETENTION_DAYS: '30'
+    volumes:
+      - ../config:/app/config:ro
+      - portal:/app/data
+volumes:
+  portal:
+  librebooking-db:
+  librebooking-app:
+  librebooking-images:
+  librebooking-reservations:
+  prometheus:
+  grafana:
