@@ -171,7 +171,8 @@ sudo bash scripts/setup_tailscale.sh 8000 iGDSL-GPU
 
 1. 중간에 주소가 하나 표시됩니다. 브라우저에서 열어 **구글/깃허브로 로그인**하면 됩니다(무료 계정).
 2. Funnel을 못 켰다는 안내가 나오면, 화면에 찍힌 링크를 열어 한 번 허용한 뒤 `sudo tailscale funnel --bg 8000` 을 다시 실행합니다.
-3. 마지막에 `외부 접속 주소: https://igdsl-gpu.____.ts.net` 이 나옵니다. 이 주소가 고정 주소입니다.
+3. **주소는 나왔는데 밖에서 "사이트에 연결할 수 없음"이 뜨면** HTTPS 인증서가 꺼져 있는 것입니다. <https://login.tailscale.com/admin/dns> 에서 **HTTPS Certificates**를 Enable한 뒤 서버에서 `sudo tailscale cert <주소>` → `sudo tailscale funnel --bg 8000` 을 실행하세요. 공개 DNS 등록까지 1~2분 걸립니다.
+4. 마지막에 `외부 접속 주소: https://igdsl-gpu.____.ts.net` 이 나옵니다. 이 주소가 고정 주소입니다.
 
 주소 앞부분은 원하는 이름(`iGDSL-GPU` → `igdsl-gpu`)으로 정해지고, 뒷부분은 Tailscale이 계정에 붙이는 이름입니다. 완전히 원하는 주소(`gpu.igdsl.kr` 같은)를 쓰려면 도메인을 구매해 부록 B로 진행하세요.
 
@@ -240,7 +241,7 @@ cd nas && docker compose up -d --build
 | nano에서 글자가 안 고쳐짐 | 편집기를 쓰지 마세요. `Ctrl+X`로 나온 뒤 `bash scripts/setup_env.sh 10.174.52.127 iGDSL1234` |
 | `.env` 값이 `CHANGE_ME` 그대로 | 위와 같은 명령으로 다시 채우고 `docker compose up -d` |
 | 외부 주소가 `Error 1033` / 530 | 임시 터널 주소가 바뀐 것입니다. `bash ~/gpu-lab/scripts/tunnel_url.sh` 로 확인하거나, 6-2로 고정 주소를 만드세요. |
-| 고정 주소가 안 열림 | 서버에서 `sudo tailscale funnel status`, 꺼져 있으면 `sudo tailscale funnel --bg 8000` |
+| 고정 주소가 안 열림 | 관리 콘솔에서 HTTPS Certificates Enable → `sudo tailscale cert <주소>` → `sudo tailscale funnel --bg 8000` |
 
 더 자세한 증상별 점검은 [장애 대응](troubleshooting.md).
 

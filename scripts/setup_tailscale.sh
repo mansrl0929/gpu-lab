@@ -14,7 +14,7 @@ HOSTNAME_TAG="$(printf '%s' "${2:-iGDSL-GPU}" | tr '[:upper:]' '[:lower:]')"
 
 [ "$(id -u)" -eq 0 ] || { echo "sudo를 붙여 실행하세요: sudo bash $0 $PORT $HOSTNAME_TAG"; exit 1; }
 
-echo "== 1/4 Tailscale 설치 =="
+echo "== 1/5 Tailscale 설치 =="
 if command -v tailscale >/dev/null; then
   echo "이미 설치되어 있습니다: $(tailscale version | head -1)"
 else
@@ -22,7 +22,7 @@ else
 fi
 
 echo
-echo "== 2/4 로그인 =="
+echo "== 2/5 로그인 =="
 if tailscale status >/dev/null 2>&1; then
   echo "이미 로그인되어 있습니다."
 else
@@ -33,7 +33,7 @@ else
 fi
 
 echo
-echo "== 3/4 외부 공개 (Funnel) =="
+echo "== 3/5 외부 공개 (Funnel) =="
 if tailscale funnel --bg "$PORT"; then
   echo "Funnel을 켰습니다."
 else
@@ -50,14 +50,34 @@ GUIDE
   exit 1
 fi
 
-echo
-echo "== 4/4 주소 확인 =="
-tailscale funnel status || true
 url="$(tailscale status --json 2>/dev/null | grep -o '"DNSName":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\.$//')"
+
+echo
+echo "== 4/5 HTTPS 인증서 =="
+# 인증서가 발급되어야 공개 DNS에 주소가 등록됩니다. 이게 빠지면 "사이트에 연결할 수 없음"이 납니다.
+if [ -n "$url" ] && tailscale cert "$url" >/dev/null 2>&1; then
+  echo "인증서 준비 완료."
+else
+  cat <<GUIDE
+
+인증서를 발급하지 못했습니다. 관리 콘솔에서 한 번만 켜 주세요.
+
+  1) https://login.tailscale.com/admin/dns 에서 HTTPS Certificates를 Enable
+  2) 서버에서 다시:
+       sudo tailscale cert ${url:-<주소>}
+       sudo tailscale funnel --bg $PORT
+
+GUIDE
+fi
+
+echo
+echo "== 5/5 주소 확인 =="
+tailscale funnel status || true
 if [ -n "$url" ]; then
   echo
   echo "외부 접속 주소: https://$url"
   echo "이 주소는 서버를 재시작해도 그대로입니다. 연구실에 이 주소와 가입 코드를 알려주세요."
+  echo "밖에서 안 열리면 공개 DNS 등록까지 1~2분 걸릴 수 있습니다."
 else
   echo "주소를 읽지 못했습니다. 'tailscale funnel status' 출력의 https:// 주소를 사용하세요."
 fi
