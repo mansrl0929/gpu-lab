@@ -99,7 +99,10 @@ class Prometheus:
             m = {key: number(key, server, gpu) for key in ['util','util_avg','vram_used_mib','temperature','power']}
             free = number('vram_free_mib', server, gpu)
             m['vram_total_mib'] = m['vram_used_mib']+free if free is not None and m['vram_used_mib'] is not None else None
-            m['reachable'] = number('up',server,job='dcgm-exporter') == 1 and m['util'] is not None
+            # GPU numbers may come from node_exporter's textfile collector or from DCGM Exporter;
+            # either source counts as reachable as long as one of them is up and the sample is fresh.
+            exporter_up = 1 in (number('up',server,job='node-exporter'), number('up',server,job='dcgm-exporter'))
+            m['reachable'] = exporter_up and m['util'] is not None
             m['history_complete'] = (number('samples',server,gpu) or 0) >= 18
             stamp = number('process_time',server)
             process_valid = number('up',server,job='node-exporter') == 1 and number('process_ok',server) == 1 and stamp is not None and 0 <= time.time()-stamp < 90

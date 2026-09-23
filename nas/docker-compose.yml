@@ -106,7 +106,18 @@ services:
     volumes:
       - ../config:/app/config:ro
       - portal:/app/data
-  # 외부 접속용 Cloudflare Tunnel. 포트를 열지 않고 HTTPS 주소를 만듭니다.
+  # 외부 접속 (1) 임시 주소: 계정도 도메인도 없이 바로 HTTPS 주소를 받습니다.
+  # 사용: docker compose --profile quicktunnel up -d
+  #      docker compose logs quicktunnel | grep trycloudflare
+  # 컨테이너를 다시 만들면 주소가 바뀝니다.
+  quicktunnel:
+    image: cloudflare/cloudflared:${CLOUDFLARED_TAG:-2025.8.1}
+    profiles: [quicktunnel]
+    restart: unless-stopped
+    depends_on: [portal]
+    command: tunnel --no-autoupdate --url http://portal:8000
+
+  # 외부 접속 (2) 고정 주소: 도메인을 연결한 Cloudflare Tunnel. 포트를 열지 않습니다.
   # 사용: docker compose --profile tunnel up -d   (TUNNEL_TOKEN 필요)
   cloudflared:
     image: cloudflare/cloudflared:${CLOUDFLARED_TAG:-2025.8.1}

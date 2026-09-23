@@ -1,5 +1,5 @@
 [Unit]
-Description=Read-only GPU process metrics for node_exporter
+Description=Read-only GPU usage and process metrics for node_exporter
 After=network.target
 
 [Service]

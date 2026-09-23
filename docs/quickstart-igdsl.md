@@ -1,6 +1,6 @@
 # iGDSL 설치 실행서
 
-이 연구실 장비에 맞춰 작성한 실제 실행 순서입니다. 모든 명령은 복사해서 붙여넣으면 됩니다.
+이 연구실 장비에 맞춰 작성한 요약 실행 순서입니다. **처음이라면 [단계별 따라하기](setup-step-by-step.md)** 를 보세요. 여기는 이미 익숙한 사람을 위한 요약입니다.
 
 | 장비 | 주소 | OS | GPU |
 |---|---|---|---|
@@ -74,12 +74,12 @@ git clone https://github.com/<계정>/gpu-lab.git ~/gpu-lab
 cd ~/gpu-lab && sudo bash scripts/install_gpu_host.sh 10.174.52.127
 ```
 
-스크립트가 하는 일: `node_exporter`(9100) 설치, GPU 프로세스 수집기(30초 타이머) 등록, DCGM Exporter(9400) 컨테이너 기동, 9100/9400을 포털 서버에서만 접근하도록 방화벽 설정. **프로세스를 종료하거나 GPU 권한을 바꾸지 않습니다.**
+스크립트가 하는 일: `node_exporter`(9100) 설치, GPU 수집기(10초 타이머) 등록, 9100을 포털 서버에서만 접근하도록 방화벽 설정. GPU 사용률·VRAM·온도·전력은 `nvidia-smi`에서 직접 읽어 내보내므로 **GPU 서버에는 Docker도 NVIDIA 컨테이너 툴킷도 필요 없습니다.** 프로세스를 종료하거나 GPU 권한을 바꾸지 않습니다.
 
 끝나면 Aurora에서 확인:
 
 ```sh
-curl -s http://10.174.52.130:9400/metrics | grep -m1 DCGM_FI_DEV_GPU_UTIL
+curl -s http://10.174.52.130:9100/metrics | grep -m1 DCGM_FI_DEV_GPU_UTIL
 docker compose -f ~/gpu-lab/nas/docker-compose.yml logs --tail=20 prometheus
 ```
 
@@ -94,11 +94,12 @@ docker compose -f ~/gpu-lab/nas/docker-compose.yml logs --tail=20 prometheus
 ### 빠르게 (임시 주소, 계정 불필요)
 
 ```sh
-# Aurora에서
-docker run --rm --network host cloudflare/cloudflared:2025.8.1 tunnel --url http://localhost:8000
+cd ~/gpu-lab/nas
+docker compose --profile quicktunnel up -d
+docker compose logs quicktunnel | grep trycloudflare
 ```
 
-출력되는 `https://xxxx-xxxx.trycloudflare.com` 주소로 어디서나 접속됩니다. 명령을 끄면 주소도 사라집니다. **임시 주소로 로그인할 때는 아래 고정 주소 설정을 먼저 하는 편이 안전합니다**(쿠키가 HTTPS 전용이 아니면 중간에서 가로챌 수 있습니다).
+출력되는 `https://xxxx-xxxx.trycloudflare.com` 주소로 어디서나 접속됩니다. 컨테이너를 다시 만들면 주소가 바뀝니다. 주소를 받은 뒤 `.env`의 `PORTAL_SECURE_COOKIES=1`로 바꾸고 `docker compose up -d portal`을 실행하세요.
 
 ### 고정 주소 (권장)
 
@@ -140,14 +141,14 @@ docker compose restart portal
 | 항목 | 주기 |
 |---|---|
 | 화면 자동 갱신 | 10초 |
-| GPU 메트릭 수집 | 10초 |
-| 서버 CPU/RAM/Disk | 15초 |
-| GPU 프로세스 사용자 | 30초 |
+| GPU 사용률·VRAM·온도 | 10초 |
+| 서버 CPU/RAM/Disk | 10초 |
+| GPU 프로세스 사용자 | 10초 |
 | 예약 대비 사용 기록 | 30초 |
 
 ## 문제가 생기면
 
-- GPU가 계속 "오프라인" → Polaris/Aurora에서 `curl localhost:9400/metrics`, 포털 서버에서 `curl 10.174.52.130:9400/metrics`.
+- GPU가 계속 "오프라인/미연동" → 각 서버에서 `curl -s localhost:9100/metrics | grep DCGM_FI_DEV_GPU_UTIL`, 포털 서버에서 `curl -s 10.174.52.130:9100/metrics | head`.
 - 실사용자가 "확인 필요" → `systemctl status lab-gpu-process.timer`, `journalctl -u lab-gpu-process.service -n 30`.
 - 그 밖의 증상은 [장애 대응](troubleshooting.md).
 

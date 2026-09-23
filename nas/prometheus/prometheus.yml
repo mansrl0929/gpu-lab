@@ -8,18 +8,21 @@ scrape_configs:
   - job_name: gpu-portal
     static_configs:
       - targets: ['portal:8000']
-  # 화면이 자주 갱신되도록 GPU 메트릭은 10초, 서버 메트릭은 15초 간격으로 읽습니다.
-  - job_name: dcgm-exporter
-    scrape_interval: 10s
-    static_configs:
-      - targets: ['10.174.52.127:9400']
-        labels: {server: igdsl-aurora}
-      - targets: ['10.174.52.130:9400']
-        labels: {server: igdsl-polaris}
+
+  # GPU 서버. node_exporter 하나가 CPU/RAM/Disk와 GPU 수치(수집기가 기록)를 함께 제공합니다.
   - job_name: node-exporter
-    scrape_interval: 15s
+    scrape_interval: 10s
     static_configs:
       - targets: ['10.174.52.127:9100']
         labels: {server: igdsl-aurora}
       - targets: ['10.174.52.130:9100']
         labels: {server: igdsl-polaris}
+
+  # 선택: NVIDIA DCGM Exporter를 따로 돌리는 경우에만 주석을 해제합니다.
+  # - job_name: dcgm-exporter
+  #   scrape_interval: 10s
+  #   static_configs:
+  #     - targets: ['10.174.52.127:9400']
+  #       labels: {server: igdsl-aurora}
+  #     - targets: ['10.174.52.130:9400']
+  #       labels: {server: igdsl-polaris}

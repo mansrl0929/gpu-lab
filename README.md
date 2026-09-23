@@ -53,7 +53,7 @@ PORTAL_SIGNUP_CODE=연구실코드 uvicorn portal.app:app --host 127.0.0.1 --por
 | 예약 추가 항목 | 프로젝트, CPU 코어, RAM, 작업 유형, 48시간 초과 사유 |
 | GPU·서버 상태 | CPU/RAM/Disk, GPU utilization/VRAM/온도/전력 |
 | 예약·실사용 통합 | FREE, RESERVED_IDLE, RESERVED_IN_USE, UNRESERVED_IN_USE, BORROWED, CONFLICT, OFFLINE, UNKNOWN |
-| 실제 사용자 확인 | `nvidia-smi` + `/proc` 읽기 전용 수집기, node_exporter textfile |
+| GPU 수치·실사용자 | `nvidia-smi` + `/proc` 읽기 전용 수집기가 node_exporter textfile로 발행 (GPU 서버에 Docker 불필요) |
 | 추이·통계 | 24시간/7일 GPU 사용률, 관측된 예약 시간·예약 중 실사용 비율·수집률 |
 | 운영 리포트 | 7일/30일 평균 사용률, 실사용·유휴 GPU-h, 학생별 GPU-hour, 멀티 GPU 예약 비율, CPU/RAM 포화 시간대 |
 | 알림 | 대여·조정 필요·오프라인·확인 필요·예약 종료 후 사용 지속 알림, Prometheus Offline/온도/XID/수집기 지연/대여 지속/포털 중단 규칙 |
@@ -71,7 +71,7 @@ iGDSL 장비가 이미 설정되어 있습니다.
 | iGDSL-Aurora | `10.174.52.127` | RTX PRO 6000 Blackwell × 4 (96 GB) |
 | iGDSL-Polaris | `10.174.52.130` | RTX A6000 × 2 (48 GB) |
 
-설치 순서는 **[iGDSL 설치 실행서](docs/quickstart-igdsl.md)** 하나만 따라가면 됩니다. GPU 호스트 수집기는 스크립트 한 줄로 설치합니다.
+설치는 **[처음 설치하기 — 단계별 따라하기](docs/setup-step-by-step.md)** 를 그대로 따라가면 됩니다(요약본은 [iGDSL 실행서](docs/quickstart-igdsl.md)). GPU 서버에는 Docker 없이 스크립트 한 줄이면 됩니다.
 
 ```sh
 sudo bash scripts/install_gpu_host.sh <포털이 도는 서버 IP>
@@ -144,6 +144,6 @@ tests/                  상태·예약·계정·연동 계약 테스트
 scripts/                브라우저 검증, Grafana 생성
 ```
 
-[iGDSL 설치 실행서](docs/quickstart-igdsl.md) · [시스템 구조](docs/architecture.md) · [배포](docs/deployment.md) · [공유·외부 접속](docs/hosting.md) · [운영 및 백업](docs/operations.md) · [장애 대응](docs/troubleshooting.md) · [기능별 인수 기준](docs/acceptance.md)
+[처음 설치하기](docs/setup-step-by-step.md) · [iGDSL 실행서](docs/quickstart-igdsl.md) · [시스템 구조](docs/architecture.md) · [배포](docs/deployment.md) · [공유·외부 접속](docs/hosting.md) · [운영 및 백업](docs/operations.md) · [장애 대응](docs/troubleshooting.md) · [기능별 인수 기준](docs/acceptance.md)
 
 공식 연동 근거: [Prometheus HTTP API](https://prometheus.io/docs/prometheus/latest/querying/api/), [DCGM Exporter](https://github.com/NVIDIA/dcgm-exporter), [node_exporter](https://github.com/prometheus/node_exporter), [LibreBooking API](https://librebooking.readthedocs.io/en/latest/API.html), [LibreBooking Docker](https://github.com/LibreBooking/docker).

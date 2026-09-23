@@ -146,7 +146,7 @@ def test_prometheus_freshness_and_unsupported_values(monkeypatch,age,up,expected
     def sample(value,**labels):
         return {'metric':{'server':'host1',**labels},'value':[stamp,str(value)]}
     values={
-        'up':[sample(up,job='dcgm-exporter'),sample(1,job='node-exporter')],
+        'up':[sample(up,job='dcgm-exporter'),sample(up,job='node-exporter')],
         'DCGM_FI_DEV_GPU_UTIL':[sample(0,gpu='0')],
         'avg_over_time(DCGM_FI_DEV_GPU_UTIL[10m])':[sample(0,gpu='0')],
         'count_over_time(DCGM_FI_DEV_GPU_UTIL[10m])':[sample(20,gpu='0')],
@@ -253,6 +253,30 @@ def test_members_list_hides_roles_from_members(portal):
         rows=other.get('/api/members').json()['members']
         assert {r['display_name'] for r in rows}=={'김민수','이서연'} and all(r['role'] is None for r in rows)
     assert [r['role'] for r in portal.get('/api/members').json()['members']]==['admin','member']
+
+def load_collector(monkeypatch):
+    """The GPU host collector is Linux-only; stub pwd so it can be checked here."""
+    import importlib.util, pathlib, sys, types
+    fake = types.ModuleType('pwd')
+    fake.getpwuid = lambda uid: types.SimpleNamespace(pw_name='student1')
+    monkeypatch.setitem(sys.modules,'pwd',fake)
+    path = pathlib.Path(__file__).resolve().parent.parent/'gpu-server'/'process_collector.py'
+    spec = importlib.util.spec_from_file_location('gpu_collector',path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+def test_collector_publishes_dcgm_metric_names(monkeypatch):
+    collector = load_collector(monkeypatch)
+    # index, util, memory.used, memory.free, temperature, power — power unsupported on GPU 1.
+    collector.smi = lambda query: [['0','100','41651','7489','86','278.55'],['1','0','95','97792','45','[N/A]']]
+    lines = collector.device_metrics()
+    assert 'DCGM_FI_DEV_GPU_UTIL{gpu="0"} 100' in lines
+    assert 'DCGM_FI_DEV_FB_USED{gpu="0"} 41651' in lines
+    assert 'DCGM_FI_DEV_FB_FREE{gpu="1"} 97792' in lines
+    assert 'DCGM_FI_DEV_GPU_TEMP{gpu="1"} 45' in lines
+    assert 'DCGM_FI_DEV_POWER_USAGE{gpu="0"} 278.55' in lines
+    assert not any(line.startswith('DCGM_FI_DEV_POWER_USAGE{gpu="1"}') for line in lines)
 
 def gpu(state,**changes):
     return {'id':'AURORA-GPU0','server':'igdsl-aurora','state':state,'metrics':metric(),'reservation':None,**changes}

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Read nvidia-smi and /proc; atomically publish node_exporter textfile metrics.
 
+Publishes GPU device metrics under the DCGM Exporter names the portal queries, so a
+plain node_exporter is enough and no GPU container runtime is needed. Running the real
+DCGM Exporter alongside also works: it serves the same names on its own port.
+
 No SSH, process signaling, device permission changes, or control operations.
 Run on the GPU host, with permission to read process UIDs.
 """
@@ -20,6 +24,30 @@ def quote(value):
 def smi(query):
     result = subprocess.run(['nvidia-smi',query,'--format=csv,noheader,nounits'],capture_output=True,text=True,check=True,timeout=15)
     return [[field.strip() for field in row] for row in csv.reader(io.StringIO(result.stdout)) if row]
+
+DEVICE_FIELDS = [
+    # nvidia-smi field, exported metric, help text
+    ('utilization.gpu', 'DCGM_FI_DEV_GPU_UTIL', 'GPU utilization (%)'),
+    ('memory.used', 'DCGM_FI_DEV_FB_USED', 'Framebuffer memory used (MiB)'),
+    ('memory.free', 'DCGM_FI_DEV_FB_FREE', 'Framebuffer memory free (MiB)'),
+    ('temperature.gpu', 'DCGM_FI_DEV_GPU_TEMP', 'GPU temperature (C)'),
+    ('power.draw', 'DCGM_FI_DEV_POWER_USAGE', 'Power draw (W)'),
+]
+
+def device_metrics():
+    query = ','.join(['index'] + [field for field, _, _ in DEVICE_FIELDS])
+    lines = []
+    for _, name, description in DEVICE_FIELDS:
+        lines += [f'# HELP {name} {description}', f'# TYPE {name} gauge']
+    for row in smi('--query-gpu=' + query):
+        index, values = row[0], row[1:]
+        for value, (_, name, _) in zip(values, DEVICE_FIELDS):
+            try:  # [N/A] and [Not Supported] appear on some devices; skip those fields.
+                number = float(value)
+            except ValueError:
+                continue
+            lines.append(f'{name}{{gpu="{quote(index)}"}} {number:g}')
+    return lines
 
 def collect():
     devices = {row[0]: row[1] for row in smi('--query-gpu=uuid,index')}
@@ -43,11 +71,11 @@ def collect():
             memory_lines.append(f'lab_gpu_process_memory_mib{{{labels}}} {int(used_memory)}')
         except ValueError:
             pass
-    return lines + memory_lines
+    return device_metrics() + lines + memory_lines
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output',default='/var/lib/prometheus/node-exporter/gpu_processes.prom')
+    parser.add_argument('--output',default='/var/lib/prometheus/node-exporter/gpu_lab.prom')
     args = parser.parse_args()
     target = Path(args.output)
     target.parent.mkdir(parents=True,exist_ok=True)
