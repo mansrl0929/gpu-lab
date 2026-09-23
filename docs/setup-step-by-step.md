@@ -158,7 +158,28 @@ sed -i 's|^PORTAL_SECURE_COOKIES=.*|PORTAL_SECURE_COOKIES=1|' .env
 docker compose up -d portal
 ```
 
-> 이 임시 주소는 컨테이너를 다시 만들면 바뀝니다. **항상 같은 주소**를 쓰려면 도메인이 필요합니다(부록 B).
+> 이 임시 주소는 컨테이너를 다시 만들면 바뀝니다. **항상 같은 주소**를 쓰려면 아래 6-2로 넘어가세요.
+
+### 6-2. 고정 주소 만들기 (권장, 무료)
+
+Tailscale Funnel을 쓰면 서버를 재시작해도 바뀌지 않는 HTTPS 주소가 생깁니다. **접속하는 사람은 아무것도 설치하지 않아도 됩니다.**
+
+```sh
+cd ~/gpu-lab
+sudo bash scripts/setup_tailscale.sh 8000 iGDSL-GPU
+```
+
+1. 중간에 주소가 하나 표시됩니다. 브라우저에서 열어 **구글/깃허브로 로그인**하면 됩니다(무료 계정).
+2. Funnel을 못 켰다는 안내가 나오면, 화면에 찍힌 링크를 열어 한 번 허용한 뒤 `sudo tailscale funnel --bg 8000` 을 다시 실행합니다.
+3. 마지막에 `외부 접속 주소: https://igdsl-gpu.____.ts.net` 이 나옵니다. 이 주소가 고정 주소입니다.
+
+주소 앞부분은 원하는 이름(`iGDSL-GPU` → `igdsl-gpu`)으로 정해지고, 뒷부분은 Tailscale이 계정에 붙이는 이름입니다. 완전히 원하는 주소(`gpu.igdsl.kr` 같은)를 쓰려면 도메인을 구매해 부록 B로 진행하세요.
+
+고정 주소를 쓰기 시작하면 임시 터널은 꺼도 됩니다.
+
+```sh
+cd ~/gpu-lab/nas && docker compose --profile quicktunnel down
+```
 
 ---
 
@@ -218,7 +239,8 @@ cd nas && docker compose up -d --build
 | 가입 코드가 안 먹힘 | 대소문자를 구분합니다. `iGDSL1234` (맨 앞 소문자 i) |
 | nano에서 글자가 안 고쳐짐 | 편집기를 쓰지 마세요. `Ctrl+X`로 나온 뒤 `bash scripts/setup_env.sh 10.174.52.127 iGDSL1234` |
 | `.env` 값이 `CHANGE_ME` 그대로 | 위와 같은 명령으로 다시 채우고 `docker compose up -d` |
-| 외부 주소가 `Error 1033` / 530 | 주소가 바뀐 것입니다. `bash ~/gpu-lab/scripts/tunnel_url.sh` 로 현재 주소를 확인하세요. |
+| 외부 주소가 `Error 1033` / 530 | 임시 터널 주소가 바뀐 것입니다. `bash ~/gpu-lab/scripts/tunnel_url.sh` 로 확인하거나, 6-2로 고정 주소를 만드세요. |
+| 고정 주소가 안 열림 | 서버에서 `sudo tailscale funnel status`, 꺼져 있으면 `sudo tailscale funnel --bg 8000` |
 
 더 자세한 증상별 점검은 [장애 대응](troubleshooting.md).
 

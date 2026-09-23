@@ -28,7 +28,8 @@ git push -u origin main
 |---|---|---|---|
 | 교내/연구실 내부망 | 같은 네트워크 | 없음 | 기본값 |
 | VPN | 학교 VPN 사용자 | 학교 VPN 계정 | 가장 안전 |
-| Cloudflare Tunnel | 인터넷 전체 | Cloudflare 계정, 도메인 | 외부 접속이 꼭 필요할 때 |
+| Tailscale Funnel | 인터넷 전체 | 무료 계정만 | 도메인 없이 고정 주소가 필요할 때 |
+| Cloudflare Tunnel | 인터넷 전체 | Cloudflare 계정, 도메인 | 원하는 도메인을 쓰고 싶을 때 |
 | 클라우드 VM + 도메인 | 인터넷 전체 | VM, 도메인, 인증서 | 운영 부담 큼 |
 
 GPU 서버와 NAS의 관리 포트(9090, 9100, 9400, DSM 5000/5001)는 **어떤 경우에도 외부에 열지 않습니다.** 외부에 여는 것은 포털(8000) 하나로 제한하세요.
@@ -68,6 +69,18 @@ PORTAL_SECURE_COOKIES=1
 ```
 
 `cloudflared`를 상시 실행하려면 `cloudflared service install` 또는 compose 서비스로 등록합니다.
+
+### Tailscale Funnel (도메인 없이 고정 주소)
+
+도메인을 사지 않고도 바뀌지 않는 HTTPS 주소를 얻습니다. 서버에만 설치하며 접속자는 아무것도 설치하지 않습니다.
+
+```sh
+sudo bash scripts/setup_tailscale.sh 8000 iGDSL-GPU
+```
+
+무료 Tailscale 계정으로 로그인하면 `https://igdsl-gpu.<tailnet>.ts.net` 이 만들어집니다. 최초 1회는 관리 콘솔에서 HTTPS Certificates와 Funnel을 허용해야 하며, 스크립트가 해당 링크를 안내합니다. 끄려면 `sudo tailscale funnel --bg off`.
+
+Funnel은 서비스를 인터넷에 공개합니다. 가입 코드와 로그인 시도 제한이 적용되지만, 공개 전 아래 점검표를 확인하세요.
 
 ### reverse proxy (Nginx 등)
 
