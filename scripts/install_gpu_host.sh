@@ -55,9 +55,11 @@ fi
 
 echo "== 4/4 확인 =="
 sleep 12   # 수집기 타이머가 한 번 돌 때까지 기다립니다.
-if curl -fsS http://127.0.0.1:9100/metrics | grep -q DCGM_FI_DEV_GPU_UTIL; then
+# 파이프로 바로 grep하면 curl이 SIGPIPE로 죽어 오탐이 납니다. 먼저 받아두고 검사합니다.
+metrics="$(curl -fsS http://127.0.0.1:9100/metrics || true)"
+if printf '%s' "$metrics" | grep -q '^DCGM_FI_DEV_GPU_UTIL'; then
   echo "OK: GPU 사용률이 수집되고 있습니다."
-  curl -fsS http://127.0.0.1:9100/metrics | grep -E '^DCGM_FI_DEV_GPU_UTIL|^lab_gpu_process_info' | head -8
+  printf '%s' "$metrics" | grep -E '^DCGM_FI_DEV_GPU_UTIL|^lab_gpu_process_info' | head -8
 else
   echo "아직 GPU 값이 없습니다. 아래로 원인을 확인하세요:"
   echo "  systemctl status lab-gpu-process.service --no-pager"

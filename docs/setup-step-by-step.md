@@ -144,11 +144,13 @@ ssh munkiyeong@10.174.52.127
 ```sh
 cd ~/gpu-lab/nas
 docker compose --profile quicktunnel up -d
-sleep 15
-docker compose logs quicktunnel | grep trycloudflare
+sleep 20
+bash ../scripts/tunnel_url.sh
 ```
 
-출력에 나오는 **`https://○○○-○○○-○○○.trycloudflare.com`** 이 외부 접속 주소입니다. 전화 데이터로도 열립니다.
+`외부 접속 주소: https://○○○-○○○-○○○.trycloudflare.com` 과 `확인: 정상 동작합니다.` 가 나오면 성공입니다. 전화 데이터로도 열립니다.
+
+이 주소는 **quicktunnel 컨테이너가 다시 뜰 때마다 바뀝니다.** 주소를 잊었거나 접속이 안 되면 언제든 `bash ~/gpu-lab/scripts/tunnel_url.sh` 로 현재 주소를 확인하세요.
 
 ```sh
 # 주소를 받은 뒤, 쿠키를 HTTPS 전용으로 바꿔줍니다 (보안)
@@ -206,6 +208,7 @@ cd nas && docker compose up -d --build
 | 가입 코드가 안 먹힘 | 대소문자를 구분합니다. `iGDSL1234` (맨 앞 소문자 i) |
 | nano에서 글자가 안 고쳐짐 | 편집기를 쓰지 마세요. `Ctrl+X`로 나온 뒤 `bash scripts/setup_env.sh 10.174.52.127 iGDSL1234` |
 | `.env` 값이 `CHANGE_ME` 그대로 | 위와 같은 명령으로 다시 채우고 `docker compose up -d` |
+| 외부 주소가 `Error 1033` / 530 | 주소가 바뀐 것입니다. `bash ~/gpu-lab/scripts/tunnel_url.sh` 로 현재 주소를 확인하세요. |
 
 더 자세한 증상별 점검은 [장애 대응](troubleshooting.md).
 
