@@ -125,7 +125,7 @@ try:
      account.on('pageerror',lambda error:errors.append(str(error)))
      account.goto(STANDALONE)
      account.wait_for_selector('#auth-screen:not([hidden])')
-     assert account.locator('#auth-title').inner_text()=='첫 관리자 계정 만들기'
+     assert account.locator('[data-auth-tab=signup]').get_attribute('class')=='selected'  # 계정이 없으면 가입 화면부터
      account.screenshot(path=str(ARTIFACTS/'signup-desktop.png'))
      account.fill('#signup-form [name=username]','labadmin')
      account.fill('#signup-form [name=display_name]','연구실 관리자')

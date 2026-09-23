@@ -100,7 +100,7 @@ document.addEventListener('click',async event=>{const tab=event.target.closest('
   if(event.target.closest('#logout-button')){try{await api('/api/auth/logout',{method:'POST'});}catch{}$('#content').innerHTML='<div class="loading">로그인이 필요합니다.</div>';signedOut();}});
 async function boot(){
   try{session=await api('/api/session');}catch{session={mode:'standalone',requires_login:true,authenticated:false,first_account:false};}
-  if(session.first_account){setAuthTab('signup');$('#auth-title').textContent='첫 관리자 계정 만들기';$('#auth-subtitle').textContent='이 워크스페이스의 첫 계정입니다. 가입하면 연구실 관리자가 됩니다.';}
+  if(session.first_account)setAuthTab('signup');
   if(!authed()){showAuth();return;}
   hideAuth();await refresh(true);
 }
