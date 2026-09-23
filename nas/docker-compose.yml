@@ -106,6 +106,16 @@ services:
     volumes:
       - ../config:/app/config:ro
       - portal:/app/data
+  # 외부 접속용 Cloudflare Tunnel. 포트를 열지 않고 HTTPS 주소를 만듭니다.
+  # 사용: docker compose --profile tunnel up -d   (TUNNEL_TOKEN 필요)
+  cloudflared:
+    image: cloudflare/cloudflared:${CLOUDFLARED_TAG:-2025.8.1}
+    profiles: [tunnel]
+    restart: unless-stopped
+    depends_on: [portal]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}  # 비어 있으면 tunnel 프로필을 켜지 마세요.
 volumes:
   portal:
   librebooking-db:

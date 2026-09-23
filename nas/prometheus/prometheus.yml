@@ -4,18 +4,22 @@ global:
 rule_files:
   - /etc/prometheus/rules.yml
 scrape_configs:
+  # 포털이 판정한 예약·Busy 상태. 30초 간격을 유지해야 GPU-hour 환산이 맞습니다.
   - job_name: gpu-portal
     static_configs:
       - targets: ['portal:8000']
-  - job_name: node-exporter
-    static_configs:
-      - targets: ['CHANGE_ME_GPU_SERVER_1_IP:9100']
-        labels: {server: gpu-server-1}
-      - targets: ['CHANGE_ME_GPU_SERVER_2_IP:9100']
-        labels: {server: gpu-server-2}
+  # 화면이 자주 갱신되도록 GPU 메트릭은 10초, 서버 메트릭은 15초 간격으로 읽습니다.
   - job_name: dcgm-exporter
+    scrape_interval: 10s
     static_configs:
-      - targets: ['CHANGE_ME_GPU_SERVER_1_IP:9400']
-        labels: {server: gpu-server-1}
-      - targets: ['CHANGE_ME_GPU_SERVER_2_IP:9400']
-        labels: {server: gpu-server-2}
+      - targets: ['10.174.52.127:9400']
+        labels: {server: igdsl-aurora}
+      - targets: ['10.174.52.130:9400']
+        labels: {server: igdsl-polaris}
+  - job_name: node-exporter
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['10.174.52.127:9100']
+        labels: {server: igdsl-aurora}
+      - targets: ['10.174.52.130:9100']
+        labels: {server: igdsl-polaris}

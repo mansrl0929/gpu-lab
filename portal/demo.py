@@ -13,19 +13,19 @@ DEMO_MEMBERS = [('student1', '김민수'), ('student2', '이서연'), ('student3
 
 # (title, project, owner, resources, start offset in hours, end offset in hours)
 DEMO_SAMPLES = [
-    ('RoMa 모델 학습', 'Sea Ice Drift', 'student1', ['S1-GPU0'], -2, 4),
-    ('논문 실험 · ablation study', 'Vision Transformer', 'student2', ['S1-GPU1'], -1, 3),
-    ('LLM fine-tuning', 'Language Model', 'student3', ['S2-GPU0'], -2, 2),
-    ('멀티 GPU 학습', 'Sea Ice Drift', 'student1', ['S1-GPU0', 'S1-GPU1'], 5, 9),
-    ('데이터셋 임베딩', 'Retrieval', 'student2', ['S2-GPU1'], 2, 5),
+    ('RoMa 모델 학습', 'Sea Ice Drift', 'student1', ['AURORA-GPU0'], -2, 4),
+    ('논문 실험 · ablation study', 'Vision Transformer', 'student2', ['AURORA-GPU1'], -1, 3),
+    ('LLM fine-tuning', 'Language Model', 'student3', ['POLARIS-GPU0'], -2, 2),
+    ('멀티 GPU 학습', 'Sea Ice Drift', 'student1', ['AURORA-GPU0', 'AURORA-GPU1'], 5, 9),
+    ('데이터셋 임베딩', 'Retrieval', 'student2', ['POLARIS-GPU1'], 2, 5),
     # Past reservations give the operating report a window to aggregate.
-    ('임베딩 추출', 'Retrieval', 'student2', ['S1-GPU2'], -6, -1),
-    ('야간 학습', 'Vision Transformer', 'student1', ['S1-GPU3'], -12, -5),
-    ('사전 실험 · augmentation', 'Sea Ice Drift', 'student2', ['S1-GPU1'], -30, -24),
-    ('멀티 GPU 사전학습', 'Vision Transformer', 'student1', ['S1-GPU2', 'S1-GPU3'], -74, -50),
-    ('추론 벤치마크', 'Retrieval', 'student3', ['S2-GPU0'], -100, -92),
-    ('데이터 전처리', 'Sea Ice Drift', 'student2', ['S2-GPU1'], -140, -132),
-    ('멀티 GPU 학습 · 2차', 'Language Model', 'student3', ['S1-GPU0', 'S1-GPU1'], -170, -150),
+    ('임베딩 추출', 'Retrieval', 'student2', ['AURORA-GPU2'], -6, -1),
+    ('야간 학습', 'Vision Transformer', 'student1', ['AURORA-GPU3'], -12, -5),
+    ('사전 실험 · augmentation', 'Sea Ice Drift', 'student2', ['AURORA-GPU1'], -30, -24),
+    ('멀티 GPU 사전학습', 'Vision Transformer', 'student1', ['AURORA-GPU2', 'AURORA-GPU3'], -74, -50),
+    ('추론 벤치마크', 'Retrieval', 'student3', ['POLARIS-GPU0'], -100, -92),
+    ('데이터 전처리', 'Sea Ice Drift', 'student2', ['POLARIS-GPU1'], -140, -132),
+    ('멀티 GPU 학습 · 2차', 'Language Model', 'student3', ['AURORA-GPU0', 'AURORA-GPU1'], -170, -150),
 ]
 
 def demo_metrics(resources):

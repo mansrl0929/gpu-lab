@@ -39,7 +39,19 @@ GPU 서버와 NAS의 관리 포트(9090, 9100, 9400, DSM 5000/5001)는 **어떤 
 
 ### Cloudflare Tunnel (외부 접속)
 
-포트를 열지 않고 HTTPS 도메인을 얻는 가장 간단한 방법입니다.
+포트를 열지 않고 HTTPS 주소를 얻는 가장 간단한 방법입니다. 이 저장소에는 `tunnel` 프로필로 `cloudflared` 서비스가 준비되어 있습니다.
+
+```sh
+# 임시 주소: 계정 없이 즉시 확인 (명령을 끄면 주소도 사라집니다)
+docker run --rm --network host cloudflare/cloudflared tunnel --url http://localhost:8000
+
+# 고정 주소: nas/.env에 TUNNEL_TOKEN을 넣고
+docker compose --profile tunnel up -d
+```
+
+터널 토큰은 Cloudflare Zero Trust → Networks → Tunnels에서 만듭니다. Public hostname은 `http://portal:8000`으로 지정합니다.
+
+직접 `cloudflared`를 설치해 쓰는 경우:
 
 ```sh
 # NAS 또는 포털이 도는 호스트에서

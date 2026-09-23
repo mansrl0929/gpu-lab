@@ -47,7 +47,7 @@ PORTAL_SIGNUP_CODE=연구실코드 uvicorn portal.app:app --host 127.0.0.1 --por
 | 기능 | 구현 방식 |
 |---|---|
 | 계정 | 가입 코드 기반 회원가입, PBKDF2-SHA256(240k) 비밀번호, 14일 HttpOnly 세션 쿠키, 로그인 시도 제한, 첫 계정 = 관리자 |
-| 한국어 통합 대시보드 | 서버별 GPU 카드, 상태·사용자 검색, 30초 갱신, 모바일 반응형 |
+| 한국어 통합 대시보드 | 서버별 GPU 카드, 상태·사용자 검색, 10초 자동 갱신, 모바일 반응형 |
 | 예약 캘린더 | KST 일별 타임라인, 날짜 이동, 멀티 GPU 예약, 상세 보기 |
 | 예약 생성·수정·취소 | SQLite 트랜잭션·중복 검사, 본인 예약만 수정(관리자는 전체) |
 | 예약 추가 항목 | 프로젝트, CPU 코어, RAM, 작업 유형, 48시간 초과 사유 |
@@ -64,14 +64,22 @@ PORTAL_SIGNUP_CODE=연구실코드 uvicorn portal.app:app --host 127.0.0.1 --por
 
 ## 실제 워크스테이션 연결
 
-아직 실제 IP와 GPU 구성이 입력되지 않았습니다. 다음만 실제 값으로 바꾸면 연동됩니다.
+iGDSL 장비가 이미 설정되어 있습니다.
 
-1. `config/resources.yml`: 워크스테이션 이름과 GPU 목록(서버 라벨, GPU index, 모델, VRAM). 예약 화면의 GPU 카드가 여기서 만들어집니다.
-2. `nas/prometheus/prometheus.yml`: 워크스테이션 exporter 주소(`IP:9100`, `IP:9400`). 30초 scrape를 전제로 합니다.
-3. `nas/.env.example` → `nas/.env`: NAS 주소, 가입 코드, Grafana 비밀번호.
-4. [배포 가이드](docs/deployment.md)에 따라 GPU 호스트에 exporter와 프로세스 수집기를 설치합니다.
+| 장비 | 주소 | GPU |
+|---|---|---|
+| iGDSL-Aurora | `10.174.52.127` | RTX PRO 6000 Blackwell × 4 (96 GB) |
+| iGDSL-Polaris | `10.174.52.130` | RTX A6000 × 2 (48 GB) |
 
-모니터링을 아직 연결하지 않아도 계정·예약·캘린더는 그대로 동작하며, 화면에는 "모니터링 미연동"으로 표시됩니다. 사용률과 운영 리포트는 연동 후부터 쌓입니다.
+설치 순서는 **[iGDSL 설치 실행서](docs/quickstart-igdsl.md)** 하나만 따라가면 됩니다. GPU 호스트 수집기는 스크립트 한 줄로 설치합니다.
+
+```sh
+sudo bash scripts/install_gpu_host.sh <포털이 도는 서버 IP>
+```
+
+장비를 바꾸면 `config/resources.yml`(GPU 목록)과 `nas/prometheus/prometheus.yml`(exporter 주소) 두 파일만 수정합니다.
+
+모니터링을 아직 연결하지 않아도 계정·예약·캘린더는 그대로 동작하며, 화면에는 "모니터링 미연동"으로 표시됩니다. 사용률과 운영 리포트는 연동 후부터 쌓입니다. 화면은 10초, GPU 메트릭은 10초, 프로세스 사용자는 30초 주기로 갱신됩니다.
 
 ```sh
 cd nas
@@ -87,13 +95,23 @@ docker compose up -d --build
 
 ## 외부에서 접속하게 하려면
 
-기본값은 내부망 전용입니다. 외부 공개는 [공유·외부 접속](docs/hosting.md)의 절차(HTTPS, `PORTAL_SECURE_COOKIES=1`, 가입 코드 관리, 포트 점검표)를 따르세요. Git 공유 시 `.env`와 `data/`(계정 DB·가입 코드)는 `.gitignore`로 제외됩니다.
+연구실 밖에서도 쓰려면 Cloudflare Tunnel로 HTTPS 주소를 만듭니다. 포트를 열지 않습니다.
+
+```sh
+# 임시 주소 (계정 불필요, 명령을 끄면 사라짐)
+docker run --rm --network host cloudflare/cloudflared tunnel --url http://localhost:8000
+
+# 고정 주소: nas/.env에 TUNNEL_TOKEN과 PORTAL_SECURE_COOKIES=1을 넣고
+docker compose --profile tunnel up -d
+```
+
+자세한 절차와 점검표는 [공유·외부 접속](docs/hosting.md), 이 연구실 기준 실행서는 [iGDSL 설치 실행서](docs/quickstart-igdsl.md)에 있습니다. Git 공유 시 `.env`와 `data/`(계정 DB·가입 코드)는 `.gitignore`로 제외됩니다.
 
 ## 데이터와 상태 판정
 
 - 프로세스가 있거나 VRAM이 256 MiB 초과이거나 최근 10분 utilization 평균이 5% 이상이면 Busy로 판단합니다.
 - Borrowable은 프로세스 수집이 정상이고, 프로세스가 없으며, 낮은 VRAM·평균 사용률과 충분한 최근 수집 표본이 확인될 때만 표시합니다.
-- 30초 scrape 기준 10분 내 최소 18개 GPU 표본, 90초 이내 프로세스 수집, 정상 exporter를 요구합니다. 미확인 데이터는 UNKNOWN/OFFLINE이며 임의로 FREE로 바꾸지 않습니다.
+- 10분 내 최소 18개 GPU 표본(현재 10초 수집이므로 약 60개), 90초 이내 프로세스 수집, 정상 exporter를 요구합니다. 미확인 데이터는 UNKNOWN/OFFLINE이며 임의로 FREE로 바꾸지 않습니다.
 - 모니터링을 연결하지 않은 상태는 장애가 아니라 "미연동"으로 구분해 표시합니다. 외부 API 오류 시 데모 데이터로 대체하지 않습니다.
 - 예약자만 실행 중이면 RESERVED_IN_USE, 다른 사용자만 실행 중이면 BORROWED, 예약자와 다른 사용자 동시 실행/예약 중첩은 CONFLICT입니다. 실제 대여 합의 여부를 판정하지는 않습니다.
 - 예약자의 포털 아이디와 Linux 계정이 다르면 `config/resources.yml`의 `users:`에 `portal_username ↔ linux_username`을 추가합니다. 없으면 포털 아이디를 Linux 계정명으로 간주합니다.
@@ -126,6 +144,6 @@ tests/                  상태·예약·계정·연동 계약 테스트
 scripts/                브라우저 검증, Grafana 생성
 ```
 
-[시스템 구조](docs/architecture.md) · [배포](docs/deployment.md) · [공유·외부 접속](docs/hosting.md) · [운영 및 백업](docs/operations.md) · [장애 대응](docs/troubleshooting.md) · [기능별 인수 기준](docs/acceptance.md)
+[iGDSL 설치 실행서](docs/quickstart-igdsl.md) · [시스템 구조](docs/architecture.md) · [배포](docs/deployment.md) · [공유·외부 접속](docs/hosting.md) · [운영 및 백업](docs/operations.md) · [장애 대응](docs/troubleshooting.md) · [기능별 인수 기준](docs/acceptance.md)
 
 공식 연동 근거: [Prometheus HTTP API](https://prometheus.io/docs/prometheus/latest/querying/api/), [DCGM Exporter](https://github.com/NVIDIA/dcgm-exporter), [node_exporter](https://github.com/prometheus/node_exporter), [LibreBooking API](https://librebooking.readthedocs.io/en/latest/API.html), [LibreBooking Docker](https://github.com/LibreBooking/docker).

@@ -2,7 +2,7 @@
 
 ## 1. 인벤토리
 
-실제 NAS IP, DSM 버전, GPU 서버별 Linux 배포판/IP, GPU 개수/모델/index, 학생 Linux 계정, 내부 subnet, 백업 대상을 기록합니다. 워크스테이션이 한 대뿐이면 `config/resources.yml`의 servers/resources에서 두 번째 서버 항목과 해당 GPU를 지우면 됩니다. `config/resources.yml`의 4090/3090 6대는 예시입니다. Windows GPU 호스트는 이 Linux용 DCGM·systemd·`/proc` 수집기를 그대로 실행할 수 없습니다. 실제 OS에 맞는 수집 방식을 별도로 구성해야 합니다.
+실제 NAS IP, DSM 버전, GPU 서버별 Linux 배포판/IP, GPU 개수/모델/index, 학생 Linux 계정, 내부 subnet, 백업 대상을 기록합니다. 워크스테이션이 한 대뿐이면 `config/resources.yml`의 servers/resources에서 두 번째 서버 항목과 해당 GPU를 지우면 됩니다. `config/resources.yml`에는 iGDSL-Aurora(RTX PRO 6000 Blackwell ×4)와 iGDSL-Polaris(RTX A6000 ×2)가 들어 있습니다. 다른 장비면 이 파일을 고칩니다. Windows GPU 호스트는 이 Linux용 DCGM·systemd·`/proc` 수집기를 그대로 실행할 수 없습니다. 실제 OS에 맞는 수집 방식을 별도로 구성해야 합니다.
 
 GPU 호스트에서 `nvidia-smi`, `nvidia-smi -L`, `free -h`, `df -hT`, `docker info`를 점검합니다. NVIDIA Container Toolkit이 정상 동작해야 합니다. NAS에는 해당 DS1522+ 모델에 Package Center가 제공하는 호환 Container Manager를 설치합니다.
 
@@ -62,7 +62,7 @@ sudo systemctl restart prometheus-node-exporter
 curl http://127.0.0.1:9100/metrics
 ```
 
-이 저장소의 `gpu-server` 디렉터리를 GPU 호스트로 복사한 뒤:
+`sudo bash scripts/install_gpu_host.sh <포털 서버 IP>`를 쓰면 아래 과정을 한 번에 처리합니다. 수동으로 하려면 `gpu-server` 디렉터리를 GPU 호스트로 복사한 뒤:
 
 ```sh
 cd gpu-server
@@ -110,4 +110,4 @@ sudo ufw status numbered
 
 프로세스 수집기를 설치하지 않아도 Grafana utilization은 보이지만 포털의 Borrowable 판정은 보수적으로 UNKNOWN이 될 수 있습니다.
 
-[시스템 구조](architecture.md) · [공유·외부 접속](hosting.md) · [운영·백업](operations.md) · [장애 대응](troubleshooting.md)
+[iGDSL 설치 실행서](quickstart-igdsl.md) · [시스템 구조](architecture.md) · [공유·외부 접속](hosting.md) · [운영·백업](operations.md) · [장애 대응](troubleshooting.md)

@@ -20,7 +20,7 @@ def client(tmp_path):
 
 def reservation(**changes):
     t=now()+timedelta(days=10)
-    return {**dict(title='Test training',project='Research',resources=['S1-GPU2','S1-GPU3'],
+    return {**dict(title='Test training',project='Research',resources=['AURORA-GPU2','AURORA-GPU3'],
                    start=t.isoformat(),end=(t+timedelta(hours=2)).isoformat()),**changes}
 
 def metric(**changes):
@@ -72,11 +72,11 @@ def test_create_edit_delete_and_persistence(client):
 def test_atomic_overlap_and_adjacent(client):
     p=reservation()
     assert client.post('/api/reservations',json=p).status_code==201
-    p['resources']=['S1-GPU3','S2-GPU1']
+    p['resources']=['AURORA-GPU3','POLARIS-GPU1']
     assert client.post('/api/reservations',json=p).status_code==409
-    p['resources']=['S2-GPU1']
+    p['resources']=['POLARIS-GPU1']
     assert client.post('/api/reservations',json=p).status_code==201
-    p['resources']=['S1-GPU3'];p['start']=p['end'];p['end']=(now()+timedelta(days=10,hours=4)).isoformat()
+    p['resources']=['AURORA-GPU3'];p['start']=p['end'];p['end']=(now()+timedelta(days=10,hours=4)).isoformat()
     assert client.post('/api/reservations',json=p).status_code==201
 
 def test_concurrent_reservations(client):
@@ -142,7 +142,7 @@ def test_librebooking_contract_and_multigpu(monkeypatch):
 @pytest.mark.parametrize('age,up,expected',[(5,1,'FREE'),(120,1,'UNKNOWN'),(5,0,'OFFLINE')])
 def test_prometheus_freshness_and_unsupported_values(monkeypatch,age,up,expected):
     stamp=time.time()
-    mapping={'resources':[{'id':'S1-GPU0','server':'host1','gpu_index':'0'}],'servers':[{'id':'host1','name':'Host'}]}
+    mapping={'resources':[{'id':'AURORA-GPU0','server':'host1','gpu_index':'0'}],'servers':[{'id':'host1','name':'Host'}]}
     def sample(value,**labels):
         return {'metric':{'server':'host1',**labels},'value':[stamp,str(value)]}
     values={
@@ -161,20 +161,20 @@ def test_prometheus_freshness_and_unsupported_values(monkeypatch,age,up,expected
     real=httpx.AsyncClient
     monkeypatch.setattr(httpx,'AsyncClient',lambda **kwargs:real(transport=httpx.MockTransport(handler),**kwargs))
     metrics,servers=asyncio.run(Prometheus('http://prom',mapping).snapshot())
-    assert metrics['S1-GPU0']['power'] is None
-    assert classify(metrics['S1-GPU0'],None)==expected
+    assert metrics['AURORA-GPU0']['power'] is None
+    assert classify(metrics['AURORA-GPU0'],None)==expected
 
 def test_live_statistics_metrics_exclude_unknown(tmp_path):
     app=create_app('live',tmp_path/'unused')
     async def reservations(*args):
         return []
     async def metrics():
-        return {'S1-GPU0':metric()},[]
+        return {'AURORA-GPU0':metric()},[]
     app.state.lb.reservations=reservations
     app.state.prom.snapshot=metrics
     with TestClient(app) as c:
         output=c.get('/metrics').text
-    assert 'lab_gpu_reserved{server="gpu-server-1",gpu="0"} 0' in output
+    assert 'lab_gpu_reserved{server="igdsl-aurora",gpu="0"} 0' in output
     assert 'gpu="1"' not in output
 
 @pytest.fixture
@@ -233,7 +233,7 @@ def test_reservations_belong_to_the_signed_in_member(portal):
         signup(other,username='leeseoyeon',password='lab-password-2',display_name='이서연')
         assert other.put('/api/reservations/'+row['id'],json=reservation()).status_code==403
         assert other.delete('/api/reservations/'+row['id']).status_code==403
-        mine=other.post('/api/reservations',json=reservation(resources=['S2-GPU0'])).json()
+        mine=other.post('/api/reservations',json=reservation(resources=['POLARIS-GPU0'])).json()
         assert mine['owner_name']=='이서연'
     assert portal.delete('/api/reservations/'+mine['id']).status_code==204  # The first account is admin.
 
@@ -255,11 +255,11 @@ def test_members_list_hides_roles_from_members(portal):
     assert [r['role'] for r in portal.get('/api/members').json()['members']]==['admin','member']
 
 def gpu(state,**changes):
-    return {'id':'S1-GPU0','server':'gpu-server-1','state':state,'metrics':metric(),'reservation':None,**changes}
+    return {'id':'AURORA-GPU0','server':'igdsl-aurora','state':state,'metrics':metric(),'reservation':None,**changes}
 
 def test_alerts_cover_overrun_after_reservation_end():
     t=now()
-    reservations=[dict(id='r1',resources=['S1-GPU0'],owner_linux='student2',owner_name='이서연',
+    reservations=[dict(id='r1',resources=['AURORA-GPU0'],owner_linux='student2',owner_name='이서연',
                        start=(t-timedelta(hours=3)).isoformat(),end=(t-timedelta(minutes=30)).isoformat())]
     running=metric(processes=[{'user':'student2'}],vram_used_mib=9000)
     alerts=build_alerts([gpu('UNRESERVED_IN_USE',metrics=running)],reservations,t)
@@ -270,15 +270,15 @@ def test_alerts_cover_overrun_after_reservation_end():
 
 def test_alerts_priority_and_display_names():
     t=now()
-    reservation=dict(id='r2',resources=['S1-GPU0'],owner_linux='student1',owner_name='김민수',
+    reservation=dict(id='r2',resources=['AURORA-GPU0'],owner_linux='student1',owner_name='김민수',
                      start=(t-timedelta(minutes=5)).isoformat(),end=(t+timedelta(hours=2)).isoformat())
     gpus=[gpu('BORROWED',metrics=metric(processes=[{'user':'student2'}]),reservation=reservation),
-          gpu('OFFLINE',id='S1-GPU1'),gpu('UNKNOWN',id='S1-GPU2'),gpu('CONFLICT',id='S1-GPU3'),gpu('FREE',id='S2-GPU0')]
+          gpu('OFFLINE',id='AURORA-GPU1'),gpu('UNKNOWN',id='AURORA-GPU2'),gpu('CONFLICT',id='AURORA-GPU3'),gpu('FREE',id='POLARIS-GPU0')]
     alerts=build_alerts(gpus,[reservation],t,['연동 오류'],[{'linux_username':'student2','display_name':'이서연'}])
     assert [a['level'] for a in alerts]==['danger','danger','warning','warning','info']
-    borrowed=next(a for a in alerts if a['resource']=='S1-GPU0')
+    borrowed=next(a for a in alerts if a['resource']=='AURORA-GPU0')
     assert borrowed['title']=='예약 시간에 다른 사용자 사용 중' and '이서연' in borrowed['message']
-    assert not build_alerts([gpu('FREE'),gpu('RESERVED_IDLE',id='S1-GPU1')],[],t)
+    assert not build_alerts([gpu('FREE'),gpu('RESERVED_IDLE',id='AURORA-GPU1')],[],t)
 
 def test_snapshot_exposes_alerts(client):
     assert isinstance(client.get('/api/snapshot').json()['alerts'],list)
@@ -286,9 +286,9 @@ def test_snapshot_exposes_alerts(client):
 def test_reservation_summary_clips_window_and_counts_multi_gpu():
     end=now()
     start=end-timedelta(days=7)
-    rows=[dict(resources=['S1-GPU0','S1-GPU1'],owner_linux='student1',start=(end-timedelta(hours=2)).isoformat(),end=end.isoformat()),
-          dict(resources=['S1-GPU0'],owner_linux='student2',start=(start-timedelta(hours=4)).isoformat(),end=(start+timedelta(hours=1)).isoformat()),
-          dict(resources=['S1-GPU0'],owner_linux='student2',start=(start-timedelta(days=3)).isoformat(),end=(start-timedelta(days=2)).isoformat())]
+    rows=[dict(resources=['AURORA-GPU0','AURORA-GPU1'],owner_linux='student1',start=(end-timedelta(hours=2)).isoformat(),end=end.isoformat()),
+          dict(resources=['AURORA-GPU0'],owner_linux='student2',start=(start-timedelta(hours=4)).isoformat(),end=(start+timedelta(hours=1)).isoformat()),
+          dict(resources=['AURORA-GPU0'],owner_linux='student2',start=(start-timedelta(days=3)).isoformat(),end=(start-timedelta(days=2)).isoformat())]
     summary=summarize_reservations(rows,start,end,[{'linux_username':'student1','display_name':'김민수'}])
     assert summary['total']==2 and summary['multi_gpu']==1 and summary['multi_gpu_percent']==50.0
     assert summary['reserved_gpu_hours']==5.0  # 2h x 2 GPUs inside the window, plus 1h clipped at the edge.
@@ -320,24 +320,24 @@ def test_reports_failure_is_not_silent(tmp_path):
 
 def test_live_metrics_expose_busy_and_borrowed(tmp_path):
     app=create_app('live',tmp_path/'unused')
-    reservation=dict(id='r3',resources=['S1-GPU0'],owner_linux='student1',owner_name='김민수',
+    reservation=dict(id='r3',resources=['AURORA-GPU0'],owner_linux='student1',owner_name='김민수',
                      start=(now()-timedelta(hours=1)).isoformat(),end=(now()+timedelta(hours=1)).isoformat())
     async def reservations(*args):
         return [reservation]
     async def metrics():
-        return {'S1-GPU0':metric(processes=[{'user':'student2'}],vram_used_mib=9000)},[]
+        return {'AURORA-GPU0':metric(processes=[{'user':'student2'}],vram_used_mib=9000)},[]
     app.state.lb.reservations=reservations
     app.state.prom.snapshot=metrics
     with TestClient(app) as c:
         output=c.get('/metrics').text
-    labels='{server="gpu-server-1",gpu="0"}'
+    labels='{server="igdsl-aurora",gpu="0"}'
     assert f'lab_gpu_busy{labels} 1' in output
     assert f'lab_gpu_borrowed{labels} 1' in output
     assert f'lab_gpu_reserved_busy{labels} 1' in output
 
 def test_process_memory_is_joined_by_pid(monkeypatch):
     stamp=time.time()
-    mapping={'resources':[{'id':'S1-GPU0','server':'host1','gpu_index':'0'}],'servers':[{'id':'host1','name':'Host'}]}
+    mapping={'resources':[{'id':'AURORA-GPU0','server':'host1','gpu_index':'0'}],'servers':[{'id':'host1','name':'Host'}]}
     def sample(value,**labels):
         return {'metric':{'server':'host1',**labels},'value':[stamp,str(value)]}
     values={
@@ -356,10 +356,10 @@ def test_process_memory_is_joined_by_pid(monkeypatch):
     real=httpx.AsyncClient
     monkeypatch.setattr(httpx,'AsyncClient',lambda **kwargs:real(transport=httpx.MockTransport(handler),**kwargs))
     metrics,_=asyncio.run(Prometheus('http://prom',mapping).snapshot())
-    assert metrics['S1-GPU0']['processes']==[{'user':'student1','pid':'4242','memory_mib':8800.0}]
+    assert metrics['AURORA-GPU0']['processes']==[{'user':'student1','pid':'4242','memory_mib':8800.0}]
 
 def test_prometheus_report_contract(monkeypatch):
-    mapping={'resources':[{'id':'S1-GPU0','server':'host1','gpu_index':'0'}],'servers':[{'id':'host1','name':'Host'}]}
+    mapping={'resources':[{'id':'AURORA-GPU0','server':'host1','gpu_index':'0'}],'servers':[{'id':'host1','name':'Host'}]}
     hour=datetime(2026,9,1,15,0,tzinfo=KST).timestamp()
     def instant(value,**labels):
         return [{'metric':{'server':'host1','gpu':'0',**labels},'value':[hour,str(value)]}]

@@ -8,7 +8,7 @@
 |---|---|---|---|
 | 중앙(NAS) | 통합 포털 (FastAPI) | `portal/`, `Dockerfile` | **계정·예약의 원본**, 예약+실사용 결합 화면, 상태 판정, 운영 리포트 |
 | 선택 | LibreBooking + MariaDB | `nas/docker-compose.yml` (`--profile librebooking`) | `PORTAL_MODE=live`일 때만 예약의 원본 |
-| 중앙(NAS) | Prometheus | `nas/prometheus/` | 30초 간격 수집, 기록 규칙, 알림 규칙 |
+| 중앙(NAS) | Prometheus | `nas/prometheus/` | GPU 10초·서버 15초·포털 30초 수집, 기록 규칙, 알림 규칙 |
 | 중앙(NAS) | Grafana | `grafana/` | 서버·GPU 상세 시각화, 장기 추이 |
 | 중앙(NAS) | Homepage | `nas/homepage/` | 학생용 단일 진입점 |
 | GPU 호스트 | DCGM Exporter | `gpu-server/docker-compose.yml` | GPU utilization/VRAM/온도/전력/XID |

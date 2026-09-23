@@ -110,6 +110,7 @@ def create_app(mode=None, db_path=None, mapping=None):
     if any(urlparse(url).scheme not in ('http','https') for url in links.values()):
         raise ValueError('Service URLs must use http or https')
     retention = int(os.getenv('PROMETHEUS_RETENTION_DAYS','30'))
+    cache_seconds = float(os.getenv('SNAPSHOT_CACHE_SECONDS','4'))
     secure_cookie = os.getenv('PORTAL_SECURE_COOKIES','').lower() in ('1','true','yes')
     user_map = {u.get('portal_username') or u.get('linux_username'): u for u in mapping.get('users',[]) if u.get('linux_username')}
 
@@ -214,8 +215,9 @@ def create_app(mode=None, db_path=None, mapping=None):
     @app.get('/api/snapshot')
     async def snapshot(request: Request=None):
         async with lock:
-            if mode == 'live' and cache['data'] and time.monotonic()-cache['at'] < 15:
-                return {**cache['data'],'current_user':None}
+            if mode != 'demo' and cache['data'] and time.monotonic()-cache['at'] < cache_seconds:
+                viewer = session_user(request) if request is not None else None
+                return {**cache['data'],'current_user':viewer}
             timestamp = now()
             errors, notice = [], None
             known = True
@@ -357,7 +359,9 @@ def create_app(mode=None, db_path=None, mapping=None):
         if not set(data.resources) <= {r['id'] for r in mapping['resources']}:
             raise HTTPException(422,'등록되지 않은 GPU입니다.')
         try:
-            return store.save(data.model_dump(mode='json'),user,reservation_id)
+            saved = store.save(data.model_dump(mode='json'),user,reservation_id)
+            cache['at'] = 0
+            return saved
         except (PermissionError,LookupError,ValueError) as exc:
             raise HTTPException(403 if isinstance(exc,PermissionError) else 404 if isinstance(exc,LookupError) else 409,str(exc)) from exc
 
@@ -374,6 +378,7 @@ def create_app(mode=None, db_path=None, mapping=None):
         writable()
         try:
             store.delete(reservation_id,user)
+            cache['at'] = 0
         except (LookupError,PermissionError) as exc:
             raise HTTPException(403 if isinstance(exc,PermissionError) else 404,str(exc)) from exc
 
