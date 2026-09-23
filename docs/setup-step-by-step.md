@@ -69,32 +69,18 @@ newgrp docker
 
 # 3-3. 코드 받기
 git clone https://github.com/<내계정>/gpu-lab.git ~/gpu-lab
-cd ~/gpu-lab/nas
-cp .env.example .env
-```
+cd ~/gpu-lab
 
-이제 설정 파일을 고칩니다.
+# 3-4. 설정 채우기 (편집기 없이 자동)
+bash scripts/setup_env.sh 10.174.52.127 iGDSL1234
 
-```sh
-nano .env
-```
-
-화면에서 **네 줄**만 아래처럼 바꿉니다. (방향키로 이동, 글자 지우기는 Backspace)
-
-```
-NAS_BIND_IP=0.0.0.0
-NAS_PUBLIC_HOST=10.174.52.127
-PORTAL_SIGNUP_CODE=iGDSL1234
-GRAFANA_ADMIN_PASSWORD=원하는비밀번호
-```
-
-저장: **Ctrl+O → Enter → Ctrl+X**.
-
-```sh
-# 3-4. 실행 (처음에는 5~10분 걸립니다)
+# 3-5. 실행 (처음에는 5~10분 걸립니다)
+cd nas
 docker compose up -d --build
 docker compose ps
 ```
+
+3-4를 실행하면 서버 주소·가입 코드가 채워지고 Grafana 비밀번호가 자동 생성되어 화면에 나옵니다. 그 값을 메모해 두세요.
 
 `portal`, `prometheus`, `grafana`, `homepage` 가 모두 `running` 이면 성공입니다.
 
@@ -166,7 +152,7 @@ docker compose logs quicktunnel | grep trycloudflare
 
 ```sh
 # 주소를 받은 뒤, 쿠키를 HTTPS 전용으로 바꿔줍니다 (보안)
-nano .env      # PORTAL_SECURE_COOKIES=1 로 수정, Ctrl+O → Enter → Ctrl+X
+sed -i 's|^PORTAL_SECURE_COOKIES=.*|PORTAL_SECURE_COOKIES=1|' .env
 docker compose up -d portal
 ```
 
@@ -218,6 +204,8 @@ cd nas && docker compose up -d --build
 | GPU가 계속 "모니터링 미연동" | 서버에서 `curl -s localhost:9100/metrics | grep DCGM_FI_DEV_GPU_UTIL` 이 나오는지 확인 |
 | 실사용자가 "확인 필요" | `systemctl status lab-gpu-process.timer`, `journalctl -u lab-gpu-process.service -n 30` |
 | 가입 코드가 안 먹힘 | 대소문자를 구분합니다. `iGDSL1234` (맨 앞 소문자 i) |
+| nano에서 글자가 안 고쳐짐 | 편집기를 쓰지 마세요. `Ctrl+X`로 나온 뒤 `bash scripts/setup_env.sh 10.174.52.127 iGDSL1234` |
+| `.env` 값이 `CHANGE_ME` 그대로 | 위와 같은 명령으로 다시 채우고 `docker compose up -d` |
 
 더 자세한 증상별 점검은 [장애 대응](troubleshooting.md).
 

@@ -36,19 +36,12 @@ sudo apt update && sudo apt install -y docker.io docker-compose-v2 git
 sudo usermod -aG docker $USER && newgrp docker
 
 git clone https://github.com/<계정>/gpu-lab.git ~/gpu-lab
-cd ~/gpu-lab/nas
-cp .env.example .env
-nano .env
+cd ~/gpu-lab
+bash scripts/setup_env.sh 10.174.52.127 iGDSL1234   # .env 자동 작성
+cd nas
 ```
 
-`.env`에서 최소한 이 네 줄을 바꿉니다.
-
-```sh
-NAS_BIND_IP=0.0.0.0              # 연구실 안에서 10.174.52.127:8000 으로 접속
-NAS_PUBLIC_HOST=10.174.52.127
-PORTAL_SIGNUP_CODE=iGDSL1234
-GRAFANA_ADMIN_PASSWORD=<직접 정한 비밀번호>
-```
+`setup_env.sh`는 `NAS_BIND_IP=0.0.0.0`, `NAS_PUBLIC_HOST`, `PORTAL_SIGNUP_CODE`를 채우고 Grafana 비밀번호를 무작위로 만들어 출력합니다.
 
 ```sh
 docker compose config --quiet     # 문법 확인
