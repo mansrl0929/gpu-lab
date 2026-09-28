@@ -81,7 +81,7 @@ try:
      page.click('nav [data-page=reservations]')
      page.wait_for_selector('.calendar')
      page.screenshot(path=str(ARTIFACTS/'calendar-desktop.png'),full_page=True)
-     for name in ['monitoring','reports','guide','connections','overview']:
+     for name in ['monitoring','reports','guide','remote','overview']:
          page.goto('http://127.0.0.1:8000/#'+name)
          page.wait_for_timeout(300)
          assert page.locator('#page-title').inner_text()
@@ -90,6 +90,10 @@ try:
              page.wait_for_selector('.table-scroll table tbody tr')
              assert page.get_by_role('heading',name='예약 대비 실사용',exact=False).count()==1
              page.screenshot(path=str(ARTIFACTS/'monitoring-desktop.png'),full_page=True)
+         if name=='remote':
+             assert page.locator('.code-block').count()>=6  # 접속 단계별 명령
+             assert '10.174.52.127' in page.locator('#content').inner_text()
+             page.screenshot(path=str(ARTIFACTS/'remote-desktop.png'),full_page=True)
          if name=='reports':
              page.wait_for_selector('.hour-strip')
              assert page.locator('.hour-cell').count()==4*24  # CPU and RAM per workstation
