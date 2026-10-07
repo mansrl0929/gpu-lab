@@ -19,7 +19,28 @@ TIMEOUT = 12
 PER_CATEGORY = 18
 THUMBNAILS_TO_FETCH = PER_CATEGORY
 
-GOOGLE = 'https://news.google.com/rss/search?q={}&hl=ko&gl=KR&ceid=KR:ko'
+# 국내는 언론사 RSS를 직접 읽습니다. 구글 뉴스 링크는 실제 기사 주소를 알 수 없어
+# 썸네일이 전부 구글 로고로 나옵니다.
+KOREAN_FEEDS = [
+    'https://www.yna.co.kr/rss/news.xml',
+    'https://www.yna.co.kr/rss/society.xml',
+    'https://rss.etnews.com/Section901.xml',
+    'https://rss.etnews.com/Section902.xml',
+    'https://feeds.feedburner.com/zdkorea',
+    'https://www.hankyung.com/feed/it',
+    'https://rss.donga.com/science.xml',
+    'https://www.khan.co.kr/rss/rssdata/science_news.xml',
+    'https://www.hani.co.kr/rss/science/',
+    'https://www.hani.co.kr/rss/',
+]
+
+OUTLETS = {
+    'www.yna.co.kr': '연합뉴스', 'rss.etnews.com': '전자신문', 'www.etnews.com': '전자신문',
+    'feeds.feedburner.com': 'ZDNet코리아', 'zdnet.co.kr': 'ZDNet코리아',
+    'www.hankyung.com': '한국경제', 'rss.donga.com': '동아사이언스', 'www.donga.com': '동아일보',
+    'www.khan.co.kr': '경향신문', 'www.hani.co.kr': '한겨레',
+    'phys.org': 'phys.org', 'www.esa.int': 'ESA',
+}
 
 REGIONS = [
     {'id': 'world', 'name': '해외', 'categories': [
@@ -42,14 +63,18 @@ REGIONS = [
     ]},
     {'id': 'korea', 'name': '국내', 'categories': [
         {'id': 'polar-kr', 'name': '극지 · 해빙', 'note': '북극·남극, 해빙, 극지연구소',
-         'feeds': [GOOGLE.format('%EB%B6%81%EA%B7%B9+%ED%95%B4%EB%B9%99+OR+%EB%82%A8%EA%B7%B9+OR+%EA%B7%B9%EC%A7%80%EC%97%B0%EA%B5%AC%EC%86%8C')],
-         'keywords': []},
+         'feeds': KOREAN_FEEDS,
+         'keywords': ['해빙', '북극', '남극', '극지', '빙하', '빙상', '영구동토', '그린란드',
+                      '아라온', '쇄빙', '남극세종', '기후변화']},
         {'id': 'remote-kr', 'name': '원격탐사 · 위성', 'note': '지구관측, 위성영상, 국토위성',
-         'feeds': [GOOGLE.format('%EC%9B%90%EA%B2%A9%ED%83%90%EC%82%AC+OR+%EC%9C%84%EC%84%B1%EC%98%81%EC%83%81+OR+%EC%A7%80%EA%B5%AC%EA%B4%80%EC%B8%A1%EC%9C%84%EC%84%B1')],
-         'keywords': []},
+         'feeds': KOREAN_FEEDS,
+         'keywords': ['위성', '원격탐사', '지구관측', '국토위성', '아리랑', '천리안', '차세대중형위성',
+                      '영상레이더', '관측 영상', '항공영상', '누리호'],
+         'exclude': ['위성방송', '위성도시']},
         {'id': 'ai-kr', 'name': 'AI · 머신러닝', 'note': '국내 인공지능 연구와 산업',
-         'feeds': [GOOGLE.format('%EC%9D%B8%EA%B3%B5%EC%A7%80%EB%8A%A5+%EC%97%B0%EA%B5%AC+OR+AI+%EB%AA%A8%EB%8D%B8')],
-         'keywords': []},
+         'feeds': KOREAN_FEEDS,
+         'keywords': ['인공지능', 'ai', '머신러닝', '딥러닝', '거대언어모델', 'llm', '생성형',
+                      '파운데이션 모델', '초거대']},
     ]},
 ]
 
@@ -153,7 +178,8 @@ async def _fetch(client, url):
         response = await client.get(url, timeout=TIMEOUT, follow_redirects=True,
                                     headers={'User-Agent': 'Mozilla/5.0 (compatible; gpu-lab-portal/1.0)'})
         response.raise_for_status()
-        return parse_feed(response.text, urlparse(url).hostname or url)
+        host = urlparse(url).hostname or url
+        return parse_feed(response.text, OUTLETS.get(host, host))
     except Exception:
         return []
 
