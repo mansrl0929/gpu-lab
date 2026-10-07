@@ -54,6 +54,23 @@ REGIONS = [
 ]
 
 MAX_IMAGE_BYTES = 6 * 1024 * 1024
+THUMBNAIL_WIDTH = 400
+
+
+def shrink(data, kind):
+    """Serve a card-sized picture. Full-resolution news photos make the page slow."""
+    try:
+        from io import BytesIO
+        from PIL import Image
+        image = Image.open(BytesIO(data))
+        if image.width <= THUMBNAIL_WIDTH:
+            return data, kind
+        image.thumbnail((THUMBNAIL_WIDTH, THUMBNAIL_WIDTH * 2), Image.LANCZOS)
+        buffer = BytesIO()
+        image.convert('RGB').save(buffer, 'JPEG', quality=78, optimize=True)
+        return buffer.getvalue(), 'image/jpeg'
+    except Exception:
+        return data, kind
 _cache = {'at': 0.0, 'data': None}
 _lock = asyncio.Lock()
 
