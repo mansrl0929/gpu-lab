@@ -176,8 +176,11 @@ def create_app(mode=None, db_path=None, mapping=None):
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'same-origin'
         response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
-        if path.startswith('/api/'):
+        if path.startswith('/api/') and not path.startswith('/api/news/image'):
             response.headers['Cache-Control'] = 'no-store'
+        elif path == '/' or path.startswith('/static/'):
+            # 브라우저가 옛 화면을 계속 쓰지 않도록 매번 확인하게 합니다 (ETag로 내용이 같으면 재전송 없음).
+            response.headers['Cache-Control'] = 'no-cache'
         return response
 
     @app.get('/api/health')

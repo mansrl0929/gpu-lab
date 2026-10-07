@@ -38,6 +38,24 @@ def folder_bytes(path):
     return int(result.stdout.split('\t', 1)[0])
 
 
+NETWORK_FILESYSTEMS = {'cifs', 'smb3', 'smbfs', 'nfs', 'nfs4', 'fuse.sshfs'}
+
+
+def is_network(path):
+    """du over a mounted share is far too slow, so those disks report capacity only."""
+    try:
+        mounts = Path('/proc/mounts').read_text(encoding='utf-8').splitlines()
+    except OSError:
+        return False
+    best = ''
+    kind = ''
+    for line in mounts:
+        parts = line.split()
+        if len(parts) >= 3 and str(path).startswith(parts[1]) and len(parts[1]) >= len(best):
+            best, kind = parts[1], parts[2]
+    return kind in NETWORK_FILESYSTEMS
+
+
 def collect(paths):
     lines = ['# HELP lab_storage_total_bytes Capacity of a data disk.', '# TYPE lab_storage_total_bytes gauge',
              '# HELP lab_storage_used_bytes Space in use on a data disk.', '# TYPE lab_storage_used_bytes gauge',
@@ -51,6 +69,8 @@ def collect(paths):
         lines += [f'lab_storage_total_bytes{{{label}}} {usage.total}',
                   f'lab_storage_used_bytes{{{label}}} {usage.used}',
                   f'lab_storage_free_bytes{{{label}}} {usage.free}']
+        if is_network(mount):
+            continue
         for entry in sorted(os.scandir(mount), key=lambda e: e.name):
             if not entry.is_dir(follow_symlinks=False) or entry.name in SKIP or entry.name.startswith('.'):
                 continue
