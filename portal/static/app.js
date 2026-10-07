@@ -84,10 +84,10 @@ function storagePage() {
     if(!disks.length)return `<section class="panel" style="margin-bottom:20px"><div class="section-head"><h2>${E(server.name)}</h2></div><div class="empty">측정된 디스크가 없습니다. 서버에서 setup_storage.sh를 실행하세요.</div></section>`;
     return `<section class="panel" style="margin-bottom:20px"><div class="section-head"><h2>${E(server.name)} <small>${E(server.id)}</small></h2><span class="meta">${disks.length}개 디스크${server.measured_at?' · '+time(server.measured_at*1000)+' 측정':''}</span></div>
     ${disks.map(disk=>{const used=disk.used||0,total=disk.total||0,pct=total?used/total*100:0;
-      const people=(disk.users||[]).filter(u=>u.bytes>0);const sum=people.reduce((a,u)=>a+u.bytes,0);
+      const people=(disk.users||[]).filter(u=>u.bytes>0&&!u.system);const sum=people.reduce((a,u)=>a+u.bytes,0);
       return `<div class="disk"><div class="disk-head"><strong>${E(disk.mount)}</strong><span>${bytes(used)} / ${bytes(total)} 사용 <b class="${pct>=85?'hot':''}">${pct.toFixed(0)}%</b></span></div>
       <div class="stack">${people.map((u,i)=>`<i style="width:${total?u.bytes/total*100:0}%;background:${palette[i%palette.length]}" title="${E(u.display)} ${bytes(u.bytes)}"></i>`).join('')}<i class="rest" style="width:${total?Math.max(0,(used-sum))/total*100:0}%"></i></div>
-      ${people.length?`<div class="legend-rows">${people.map((u,i)=>`<span><i style="background:${palette[i%palette.length]}"></i>${E(u.display)}${u.claimed?'':' <small>미연결</small>'}<b>${bytes(u.bytes)}</b></span>`).join('')}</div>`:'<p class="form-intro">사용자 폴더가 아직 없습니다.</p>'}</div>`;}).join('')}</section>`;}).join('')+
+      ${people.length?`<div class="legend-rows">${people.map((u,i)=>`<span><i style="background:${palette[i%palette.length]}"></i>${E(u.display)}${u.claimed?'':' <small>미연결</small>'}<b>${bytes(u.bytes)}</b></span>`).join('')}</div>`:'<p class="form-intro">사용자 폴더가 없습니다.</p>'}</div>`;}).join('')}</section>`;}).join('')+
     `<p class="form-intro">30분마다 측정합니다. 폴더 이름은 워크스테이션 로그인 계정이며, <a class="text-link" href="#accounts">계정 연결</a>을 하면 한글 이름으로 보입니다.</p>`;
 }
 function accountsPage() {

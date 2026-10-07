@@ -411,13 +411,19 @@ def create_app(mode=None, db_path=None, mapping=None):
         except Exception as exc:
             logger.warning('Storage unavailable: %s',type(exc).__name__)
             raise HTTPException(503,'저장공간 정보를 가져오지 못했습니다.') from exc
+        try:
+            known = await prom.accounts()
+        except Exception:
+            known = {}
         for server in servers:
+            people = known.get(server['id'])
             for disk in server['disks']:
+                # 사람 폴더만 남깁니다. 윈도우 잔여 폴더나 시스템 디렉터리는 목록에 넣지 않습니다.
+                disk['users'] = [row for row in disk['users']
+                                 if row['user'] != '(system)' and (not people or row['user'] in people)]
                 for row in disk['users']:
-                    system = row['user'] == '(system)'
-                    row['display'] = '시스템 · 기타' if system else display_name(row['user'],links)
-                    row['claimed'] = system or row['user'] in links
-                    row['system'] = system
+                    row['display'] = display_name(row['user'],links)
+                    row['claimed'] = row['user'] in links
         return {'servers':servers,'mode':mode}
 
     @app.get('/api/linux-accounts')
