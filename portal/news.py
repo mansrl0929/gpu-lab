@@ -95,12 +95,18 @@ def allowed_image(url):
     if host == 'localhost' or host.endswith(('.local', '.internal')):
         return False
     try:
+        ipaddress.ip_address(host)
+        return False  # 숫자 주소는 받지 않습니다.
+    except ValueError:
+        pass
+    try:
         for *_, address in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP):
             ip = ipaddress.ip_address(address[0])
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
                 return False
     except (socket.gaierror, ValueError, IndexError):
-        return False
+        # 이름을 못 찾으면 어차피 연결도 실패합니다. 여기서 모든 이미지를 막지는 않습니다.
+        return '.' in host
     return True
 
 
