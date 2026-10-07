@@ -49,6 +49,15 @@ def device_metrics():
             lines.append(f'{name}{{gpu="{quote(index)}"}} {number:g}')
     return lines
 
+def login_accounts():
+    """Real login accounts (uid >= 1000 with a shell), so the portal lists people, not folders."""
+    names = []
+    for entry in pwd.getpwall():
+        if 1000 <= entry.pw_uid < 65534 and not entry.pw_shell.endswith(('nologin', 'false')):
+            names.append(entry.pw_name)
+    lines = ['# HELP lab_user_account A login account on this workstation.', '# TYPE lab_user_account gauge']
+    return lines + [f'lab_user_account{{user="{quote(name)}"}} 1' for name in sorted(names)]
+
 def collect():
     devices = {row[0]: row[1] for row in smi('--query-gpu=uuid,index')}
     rows = smi('--query-compute-apps=gpu_uuid,pid,used_memory')
@@ -71,7 +80,7 @@ def collect():
             memory_lines.append(f'lab_gpu_process_memory_mib{{{labels}}} {int(used_memory)}')
         except ValueError:
             pass
-    return device_metrics() + lines + memory_lines
+    return device_metrics() + login_accounts() + lines + memory_lines
 
 def main():
     parser = argparse.ArgumentParser()

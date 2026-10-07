@@ -130,6 +130,17 @@ class Prometheus:
             output[r['id']] = [[t,float(v)] for t,v in row['values'] if math.isfinite(float(v)) and 0 <= float(v) <= 100] if row else []
         return output
 
+    async def accounts(self):
+        """Login accounts each workstation reports, so the portal can list people to link."""
+        async with httpx.AsyncClient(timeout=12) as client:
+            rows = await self.query(client, 'lab_user_account')
+        found = {}
+        for row in rows:
+            server, user = row['metric'].get('server'), row['metric'].get('user')
+            if server and user:
+                found.setdefault(server, set()).add(user)
+        return found
+
     async def storage(self):
         """Per-disk capacity and per-user folder sizes, grouped by server."""
         queries = {'total': 'lab_storage_total_bytes', 'used': 'lab_storage_used_bytes',

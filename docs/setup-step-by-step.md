@@ -150,6 +150,12 @@ cd ~/gpu-lab
 sudo bash scripts/setup_storage.sh /mnt/ssd1 /mnt/ssd2
 ```
 
+`/home` 처럼 이미 사람별 폴더가 있는 곳은 폴더를 만들 필요가 없으니 `--measure-only` 를 붙입니다. NAS 같은 네트워크 공유는 전체 용량만 측정하고 폴더별 측정은 자동으로 건너뜁니다.
+
+```sh
+sudo bash scripts/setup_storage.sh --measure-only /home /mnt/nas
+```
+
 로그인 계정 이름으로 폴더를 만들고(이미 있으면 그대로 둡니다) 수집기를 등록합니다. 포털의 **저장공간** 메뉴에서 디스크별·사람별 사용량이 보입니다. 두 서버 각각에서 실행하세요.
 
 ---

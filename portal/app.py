@@ -414,43 +414,40 @@ def create_app(mode=None, db_path=None, mapping=None):
         for server in servers:
             for disk in server['disks']:
                 for row in disk['users']:
-                    row['display'] = display_name(row['user'],links)
-                    row['claimed'] = row['user'] in links
+                    system = row['user'] == '(system)'
+                    row['display'] = '시스템 · 기타' if system else display_name(row['user'],links)
+                    row['claimed'] = system or row['user'] in links
+                    row['system'] = system
         return {'servers':servers,'mode':mode}
 
     @app.get('/api/linux-accounts')
     async def linux_accounts(user=Depends(require_user)):
-        """Accounts seen on each workstation, so a member can claim their own."""
+        """Login accounts on each workstation, so a member can claim their own."""
         links = account_links()
         found = {server['id']: set() for server in mapping['servers']}
-        if monitoring:
+        if mode == 'demo':
+            for server in mapping['servers']:
+                found[server['id']] = {name for name, _ in DEMO_MEMBERS}
+        elif monitoring:
             try:
-                for server in await prom.storage():
-                    for disk in server['disks']:
-                        found[server['id']].update(row['user'] for row in disk['users'])
+                for server, names in (await prom.accounts()).items():
+                    found.setdefault(server, set()).update(names)
             except Exception:
-                logger.warning('Storage lookup for accounts failed')
-            try:
-                data = await snapshot()
-                for gpu in data['gpus']:
-                    for process in gpu['metrics'].get('processes') or []:
-                        found.setdefault(gpu['server'],set()).add(process['user'])
-            except Exception:
-                logger.warning('Snapshot lookup for accounts failed')
+                logger.warning('Account lookup failed')
         for linux_username, info in links.items():
             for server in info['servers']:
-                found.setdefault(server,set()).add(linux_username)
+                found.setdefault(server, set()).add(linux_username)
         rows = []
         for server in mapping['servers']:
             accounts = []
-            for name in sorted(found.get(server['id'],())):
+            for name in sorted(found.get(server['id'], ())):
                 link = links.get(name)
                 on_server = link and server['id'] in link['servers']
-                accounts.append({'linux_username':name,
-                                 'claimed_by':link['display_name'] if on_server else None,
-                                 'mine':bool(on_server and user and link['username']==user['username'])})
-            rows.append({'id':server['id'],'name':server['name'],'accounts':accounts})
-        return {'servers':rows,'me':user}
+                accounts.append({'linux_username': name,
+                                 'claimed_by': link['display_name'] if on_server else None,
+                                 'mine': bool(on_server and user and link['username'] == user['username'])})
+            rows.append({'id': server['id'], 'name': server['name'], 'accounts': accounts})
+        return {'servers': rows, 'me': user}
 
     class AccountClaim(BaseModel):
         server: str = Field(min_length=1, max_length=64)
