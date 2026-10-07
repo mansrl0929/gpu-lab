@@ -50,19 +50,23 @@ def login_accounts():
 NETWORK_FILESYSTEMS = {'cifs', 'smb3', 'smbfs', 'nfs', 'nfs4', 'fuse.sshfs'}
 
 
-def is_network(path):
-    """du over a mounted share is far too slow, so those disks report capacity only."""
+def mount_info(path):
+    """Return (filesystem, source device) for the mount holding this path."""
     try:
         mounts = Path('/proc/mounts').read_text(encoding='utf-8').splitlines()
     except OSError:
-        return False
-    best = ''
-    kind = ''
+        return '', ''
+    best, kind, source = '', '', ''
     for line in mounts:
         parts = line.split()
         if len(parts) >= 3 and str(path).startswith(parts[1]) and len(parts[1]) >= len(best):
-            best, kind = parts[1], parts[2]
-    return kind in NETWORK_FILESYSTEMS
+            best, source, kind = parts[1], parts[0], parts[2]
+    return kind, source
+
+
+def is_network(path):
+    """du over a mounted share is far too slow, so those disks report capacity only."""
+    return mount_info(path)[0] in NETWORK_FILESYSTEMS
 
 
 def collect(paths):
@@ -74,11 +78,14 @@ def collect(paths):
         if not mount.is_dir():
             continue
         usage = shutil.disk_usage(mount)
-        label = f'mount="{quote(mount)}"'
+        filesystem, source = mount_info(mount)
+        network = filesystem in NETWORK_FILESYSTEMS
+        label = (f'mount="{quote(mount)}",kind="{"network" if network else "local"}",'
+                 f'source="{quote(source)}"')
         lines += [f'lab_storage_total_bytes{{{label}}} {usage.total}',
                   f'lab_storage_used_bytes{{{label}}} {usage.used}',
                   f'lab_storage_free_bytes{{{label}}} {usage.free}']
-        if is_network(mount):
+        if network:
             continue
         people = login_accounts()
         other = 0

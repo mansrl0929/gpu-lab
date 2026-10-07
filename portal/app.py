@@ -395,6 +395,13 @@ def create_app(mode=None, db_path=None, mapping=None):
 
     # --- storage, accounts, news ---------------------------------------------
 
+    def share_name(disk):
+        """//10.174.52.133/iGDSL_Shared 같은 주소에서 공유 이름만 꺼냅니다."""
+        source = (disk.get('source') or '').rstrip('/')
+        if '/' in source:
+            return source.rsplit('/', 1)[-1] or disk['mount']
+        return disk['mount']
+
     @app.get('/api/storage')
     async def storage():
         links = account_links()
@@ -405,7 +412,10 @@ def create_app(mode=None, db_path=None, mapping=None):
                     for row in disk['users']:
                         row['display'] = display_name(row['user'],links)
                         row['claimed'] = row['user'] in links
-            return {'servers':servers,'mode':mode}
+            return {'servers':servers,'mode':mode,
+                    'shared':[{'mount':'/mnt/nas','name':'iGDSL-NAS','kind':'network',
+                               'total':47*1024**4,'used':round(26.2*1024**4),'free':round(20.8*1024**4),
+                               'users':[],'servers':[s['name'] for s in mapping['servers']]}]}
         monitoring_required()
         try:
             servers = await prom.storage()
@@ -416,16 +426,27 @@ def create_app(mode=None, db_path=None, mapping=None):
             known = await prom.accounts()
         except Exception:
             known = {}
+        names = {entry['mount']: entry for entry in mapping.get('shared_storage', [])}
+        shared = {}
         for server in servers:
             people = known.get(server['id'])
+            local = []
             for disk in server['disks']:
+                if disk.get('kind') == 'network':
+                    # 공유 스토리지는 서버별 디스크가 아니라 아래에 따로 묶어 보여줍니다.
+                    entry = shared.setdefault(disk['mount'], {**disk, 'servers': [],
+                                                              'name': (names.get(disk['mount']) or {}).get('name') or share_name(disk)})
+                    entry['servers'].append(server['name'])
+                    continue
                 # 사람 폴더만 남깁니다. 윈도우 잔여 폴더나 시스템 디렉터리는 목록에 넣지 않습니다.
                 disk['users'] = [row for row in disk['users']
                                  if row['user'] != '(system)' and (not people or row['user'] in people)]
                 for row in disk['users']:
                     row['display'] = display_name(row['user'],links)
                     row['claimed'] = row['user'] in links
-        return {'servers':servers,'mode':mode}
+                local.append(disk)
+            server['disks'] = local
+        return {'servers':servers,'shared':list(shared.values()),'mode':mode}
 
     @app.delete('/api/members',status_code=204)
     def remove_member(username: str, user=Depends(require_user)):

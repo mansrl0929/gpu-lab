@@ -169,7 +169,8 @@ class Prometheus:
                 free = next((number(r) for r in rows('free', sid) if r['metric'].get('mount') == mount), None)
                 people = sorted(({'user': user, 'bytes': size} for user, size in sizes.get(mount, {}).items()),
                                 key=lambda item: -item['bytes'])
-                disks.append({'mount': mount, 'total': number(row), 'used': used, 'free': free, 'users': people})
+                disks.append({'mount': mount, 'total': number(row), 'used': used, 'free': free, 'users': people,
+                              'kind': row['metric'].get('kind', 'local'), 'source': row['metric'].get('source', '')})
             stamp = next((number(r) for r in rows('at', sid)), None)
             ok = next((number(r) for r in rows('ok', sid)), None)
             servers.append({**server, 'disks': disks, 'measured_at': stamp,

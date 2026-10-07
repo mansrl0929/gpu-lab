@@ -71,10 +71,12 @@ function storagePage() {
   if(!storage)return `<div class="panel empty">${E(storageError||'저장공간 정보를 불러오는 중…')}</div>`;
   const palette=['#5961df','#8b63cc','#219780','#dc9843','#4a93c9','#c96a8f','#6f7b8c'];
   const all=storage.servers.flatMap(s=>s.disks||[]);
-  const total=all.reduce((a,d)=>a+(d.total||0),0),used=all.reduce((a,d)=>a+(d.used||0),0);
+  const shared=storage.shared||[];
+  const every=[...all,...shared];
+  const total=every.reduce((a,d)=>a+(d.total||0),0),used=every.reduce((a,d)=>a+(d.used||0),0);
   const byUser={};all.forEach(d=>(d.users||[]).forEach(u=>{byUser[u.display]=(byUser[u.display]||0)+u.bytes;}));
   const top=Object.entries(byUser).sort((a,b)=>b[1]-a[1])[0];
-  const summary=[['전체 용량',bytes(total),'','▧','',`디스크 ${all.length}개 · 서버 ${storage.servers.length}대`],
+  const summary=[['전체 용량',bytes(total),'','▧','',`디스크 ${all.length}개 · 공유 ${shared.length}개`],
     ['사용 중',bytes(used),'','⌁','purple',total?`${(used/total*100).toFixed(0)}% 사용`:''],
     ['남은 용량',bytes(total-used),'','◉','green',total?`${((total-used)/total*100).toFixed(0)}% 여유`:''],
     ['가장 많이 쓰는 사람',top?top[0]:'—','','◇','orange',top?bytes(top[1]):'측정된 폴더 없음']];
@@ -88,7 +90,12 @@ function storagePage() {
       return `<div class="disk"><div class="disk-head"><strong>${E(disk.mount)}</strong><span>${bytes(used)} / ${bytes(total)} 사용 <b class="${pct>=85?'hot':''}">${pct.toFixed(0)}%</b></span></div>
       <div class="stack">${people.map((u,i)=>`<i style="width:${total?u.bytes/total*100:0}%;background:${palette[i%palette.length]}" title="${E(u.display)} ${bytes(u.bytes)}"></i>`).join('')}<i class="rest" style="width:${total?Math.max(0,(used-sum))/total*100:0}%"></i></div>
       ${people.length?`<div class="legend-rows">${people.map((u,i)=>`<span><i style="background:${palette[i%palette.length]}"></i>${E(u.display)}${u.claimed?'':' <small>미연결</small>'}<b>${bytes(u.bytes)}</b></span>`).join('')}</div>`:'<p class="form-intro">사용자 폴더가 없습니다.</p>'}</div>`;}).join('')}</section>`;}).join('')+
-    `<p class="form-intro">30분마다 측정합니다. 폴더 이름은 워크스테이션 로그인 계정이며, <a class="text-link" href="#accounts">계정 연결</a>을 하면 한글 이름으로 보입니다.</p>`;
+    shared.map(disk=>{const used=disk.used||0,total=disk.total||0,pct=total?used/total*100:0;
+    return `<section class="panel" style="margin-bottom:20px"><div class="section-head"><h2>${E(disk.name)} <small>공유 저장소 · ${E(disk.mount)}</small></h2><span class="meta">${(disk.servers||[]).join(', ')}에서 연결</span></div>
+    <div class="disk-head"><strong>전체 용량</strong><span>${bytes(used)} / ${bytes(total)} 사용 <b class="${pct>=85?'hot':''}">${pct.toFixed(0)}%</b></span></div>
+    <div class="stack"><i style="width:${pct}%;background:#5961df"></i></div>
+    <p class="form-intro">네트워크 공유라 폴더별 사용량은 측정하지 않습니다.</p></section>`;}).join('')+
+  `<p class="form-intro">30분마다 측정합니다. 폴더 이름은 워크스테이션 로그인 계정이며, <a class="text-link" href="#accounts">계정 연결</a>을 하면 한글 이름으로 보입니다.</p>`;
 }
 function accountsPage() {
   const me=me_();

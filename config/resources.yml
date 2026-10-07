@@ -18,3 +18,6 @@ resources:
 users: []
 #  - {portal_username: munkiyeong, linux_username: munkiyeong, display_name: 문기영}
 #  - {portal_username: kiyeong, linux_username: kiyeong, display_name: 문기영}
+# 두 서버가 함께 쓰는 공유 저장소. 이름만 지정하면 저장공간 화면 아래에 따로 표시됩니다.
+shared_storage:
+  - {mount: /mnt/nas, name: iGDSL-NAS}
