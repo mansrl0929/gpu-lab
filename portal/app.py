@@ -18,7 +18,7 @@ from .accounts import LoginThrottle, SESSION_DAYS, normalize_username, validate_
 from .alerts import build_alerts
 from .demo import DEMO_MEMBERS, DEMO_SAMPLES, KST, demo_history, demo_metrics, demo_report, demo_storage, now
 from .integrations import LibreBooking, Prometheus
-from .news import allowed_image, collect as collect_news
+from .news import MAX_IMAGE_BYTES, allowed_image, collect as collect_news
 from .reports import merge_user_hours, summarize_reservations
 from .state import classify
 from .store import Store
@@ -499,8 +499,8 @@ def create_app(mode=None, db_path=None, mapping=None):
         except Exception as exc:
             raise HTTPException(502,'이미지를 가져오지 못했습니다.') from exc
         kind = upstream.headers.get('content-type','image/jpeg').split(';')[0]
-        if not kind.startswith('image/'):
-            raise HTTPException(415,'이미지가 아닙니다.')
+        if not kind.startswith('image/') or len(upstream.content) > MAX_IMAGE_BYTES:
+            raise HTTPException(415,'이미지가 아니거나 너무 큽니다.')
         return Response(upstream.content,media_type=kind,headers={'Cache-Control':'public, max-age=86400'})
 
     # --- reservations -------------------------------------------------------

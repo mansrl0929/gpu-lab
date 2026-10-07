@@ -5,7 +5,9 @@ browsers never talk to the news CDNs directly.
 """
 import asyncio
 import html
+import ipaddress
 import re
+import socket
 import time
 from urllib.parse import urlparse
 from xml.etree import ElementTree
@@ -15,7 +17,7 @@ import httpx
 CACHE_SECONDS = 1800
 TIMEOUT = 12
 PER_CATEGORY = 18
-THUMBNAILS_TO_FETCH = 10
+THUMBNAILS_TO_FETCH = PER_CATEGORY
 
 GOOGLE = 'https://news.google.com/rss/search?q={}&hl=ko&gl=KR&ceid=KR:ko'
 
@@ -51,9 +53,7 @@ REGIONS = [
     ]},
 ]
 
-ALLOWED_IMAGE_HOSTS = {'phys.org', 'scx1.b-cdn.net', 'scx2.b-cdn.net', 'www.esa.int', 'esa.int',
-                       'lh3.googleusercontent.com', 'lh4.googleusercontent.com',
-                       'lh5.googleusercontent.com', 'lh6.googleusercontent.com'}
+MAX_IMAGE_BYTES = 6 * 1024 * 1024
 _cache = {'at': 0.0, 'data': None}
 _lock = asyncio.Lock()
 
@@ -69,11 +69,29 @@ def _upgrade(url):
     return url.replace('/csz/news/tmb/', '/csz/news/800a/') if url else url
 
 
+def allowed_image(url):
+    """Any public https image may be proxied; private and loopback addresses never are."""
+    parsed = urlparse(url or '')
+    if parsed.scheme != 'https' or not parsed.hostname:
+        return False
+    host = parsed.hostname.lower()
+    if host == 'localhost' or host.endswith(('.local', '.internal')):
+        return False
+    try:
+        for *_, address in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP):
+            ip = ipaddress.ip_address(address[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False
+    except (socket.gaierror, ValueError, IndexError):
+        return False
+    return True
+
+
 def _image(item):
     for tag in ('{http://search.yahoo.com/mrss/}thumbnail', '{http://search.yahoo.com/mrss/}content', 'enclosure'):
         for node in item.iter(tag):
             url = node.get('url')
-            if url and urlparse(url).hostname in ALLOWED_IMAGE_HOSTS:
+            if url and urlparse(url).scheme == 'https':
                 return _upgrade(url)
     return None
 
@@ -117,16 +135,26 @@ async def _fetch(client, url):
         return []
 
 
-async def _thumbnail(client, item):
-    """Feeds without images still have one on the article page."""
-    try:
-        page = await client.get(item['link'], timeout=TIMEOUT, follow_redirects=True,
-                                headers={'User-Agent': 'Mozilla/5.0 (compatible; gpu-lab-portal/1.0)'})
-        found = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', page.text)
-        if found and urlparse(found.group(1)).hostname in ALLOWED_IMAGE_HOSTS:
-            item['image'] = found.group(1)
-    except Exception:
-        pass
+THUMBNAIL_PATTERNS = (
+    r'<meta[^>]+property=["\']og:image(?::url)?["\'][^>]+content=["\']([^"\']+)',
+    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+    r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)',
+)
+
+
+async def _thumbnail(client, item, limit):
+    """Feeds without images still have one on the article page, whatever CDN hosts it."""
+    async with limit:
+        try:
+            page = await client.get(item['link'], timeout=8, follow_redirects=True,
+                                    headers={'User-Agent': 'Mozilla/5.0 (compatible; gpu-lab-portal/1.0)'})
+            for pattern in THUMBNAIL_PATTERNS:
+                found = re.search(pattern, page.text)
+                if found and found.group(1).startswith('https://'):
+                    item['image'] = html.unescape(found.group(1))
+                    return
+        except Exception:
+            pass
 
 
 async def collect():
@@ -154,13 +182,11 @@ async def collect():
                     categories.append({'id': category['id'], 'name': category['name'],
                                        'note': category['note'], 'items': items})
                 regions.append({'id': region['id'], 'name': region['name'], 'categories': categories})
-            await asyncio.gather(*(_thumbnail(client, item) for item in missing))
+            limit = asyncio.Semaphore(8)
+            await asyncio.gather(*(_thumbnail(client, item, limit) for item in missing))
         data = {'regions': regions, 'fetched_at': time.time()}
         if any(category['items'] for region in regions for category in region['categories']):
             _cache.update(at=time.monotonic(), data=data)
         return data
 
 
-def allowed_image(url):
-    parsed = urlparse(url)
-    return parsed.scheme == 'https' and parsed.hostname in ALLOWED_IMAGE_HOSTS
