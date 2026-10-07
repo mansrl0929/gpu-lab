@@ -64,6 +64,25 @@ def demo_report(mapping, days):
     observed = {'student1': round(window*.31, 1), 'student2': round(window*.22, 1), 'student3': round(window*.08, 1)}
     return {'gpus': gpus, 'servers': servers, 'observed_user_hours': observed}
 
+def demo_storage(mapping):
+    """예시 디스크 2개씩. 실제 측정값이 아니라는 표시는 화면이 담당합니다."""
+    terabyte = 2*1024**4
+    shares = [
+        [('student1', .31), ('student2', .22), ('student3', .11)],
+        [('student2', .40), ('student1', .14)],
+    ]
+    servers = []
+    for index, server in enumerate(mapping['servers']):
+        disks = []
+        for disk_index in range(2):
+            people = shares[(index+disk_index) % len(shares)]
+            users = [{'user': user, 'bytes': round(terabyte*share)} for user, share in people]
+            used = sum(row['bytes'] for row in users) + round(terabyte*.04)
+            disks.append({'mount': f'/mnt/ssd{disk_index+1}', 'total': terabyte, 'used': used,
+                          'free': terabyte-used, 'users': users})
+        servers.append({**server, 'disks': disks, 'measured_at': now().timestamp(), 'collector_ok': True})
+    return servers
+
 def demo_history(resources, hours):
     end = now().timestamp()
     return {r['id']: [[end-hours*3600+j*hours*3600/96, round(max(0, min(100, 32+28*math.sin(j/7+i)+20*math.sin(j/3))), 1)]

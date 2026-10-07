@@ -7,16 +7,18 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
+import httpx
 import yaml
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from starlette.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 from .accounts import LoginThrottle, SESSION_DAYS, normalize_username, validate_signup
 from .alerts import build_alerts
-from .demo import DEMO_MEMBERS, DEMO_SAMPLES, KST, demo_history, demo_metrics, demo_report, now
+from .demo import DEMO_MEMBERS, DEMO_SAMPLES, KST, demo_history, demo_metrics, demo_report, demo_storage, now
 from .integrations import LibreBooking, Prometheus
+from .news import allowed_image, collect as collect_news
 from .reports import merge_user_hours, summarize_reservations
 from .state import classify
 from .store import Store
@@ -128,9 +130,37 @@ def create_app(mode=None, db_path=None, mapping=None):
         response.set_cookie(SESSION_COOKIE, store.start_session(user['id']), max_age=SESSION_DAYS*86400,
                             httponly=True, samesite='lax', secure=secure_cookie, path='/')
 
-    def linux_name(username):
-        # Members sign up with a portal id only; admins may map it to a different Linux account.
+    def account_links():
+        return store.links() if store else {}
+
+    def linux_name(username, server=None, links=None):
+        """Portal id → the Linux account that person uses, on this server when known."""
+        links = account_links() if links is None else links
+        matches = [name for name, info in links.items() if info['username'] == username]
+        if server:
+            on_server = [name for name in matches if server in links[name]['servers']]
+            if on_server:
+                return on_server[0]
+        if matches:
+            return matches[0]
         return (user_map.get(username) or {}).get('linux_username', username)
+
+    def display_name(linux_username, links=None):
+        """Linux account → the Korean name to show, once someone has claimed it."""
+        links = account_links() if links is None else links
+        if linux_username in links:
+            return links[linux_username]['display_name']
+        return (user_map.get(linux_username) or {}).get('display_name') or linux_username
+
+    def people_names(links=None):
+        """Name table for alerts and reports, keyed by whatever identifier they carry."""
+        links = account_links() if links is None else links
+        rows = [{'linux_username': name, 'display_name': info['display_name']} for name, info in links.items()]
+        rows += [{'linux_username': info['username'], 'display_name': info['display_name']} for info in links.values()]
+        rows += [u for u in mapping.get('users', []) if u.get('linux_username')]
+        if store:
+            rows += [{'linux_username': u['username'], 'display_name': u['display_name']} for u in store.list_users()]
+        return rows
 
     @app.middleware('http')
     async def headers(request: Request, call_next):
@@ -251,11 +281,17 @@ def create_app(mode=None, db_path=None, mapping=None):
                     servers = [{**s,'online':False,'cpu':None,'ram':None,'ram_total':None,'disk':None} for s in mapping['servers']]
                 else:
                     metrics, servers = prom_result
-            matched = reservations if mode == 'live' else [{**r,'owner_linux':linux_name(r['owner_linux'])} for r in reservations]
-            gpus = []
+            links = account_links()
+            gpus, matched = [], []
             for resource in mapping['resources']:
-                current = [r for r in matched if resource['id'] in r['resources'] and datetime.fromisoformat(r['start']) <= timestamp < datetime.fromisoformat(r['end'])]
+                server = resource['server']
+                # 같은 사람이라도 서버마다 로그인 계정이 다를 수 있어 서버 기준으로 맞춥니다.
+                here = reservations if mode == 'live' else [{**r,'owner_linux':linux_name(r['owner_linux'],server,links)} for r in reservations]
+                matched = here if not matched else matched
+                current = [r for r in here if resource['id'] in r['resources'] and datetime.fromisoformat(r['start']) <= timestamp < datetime.fromisoformat(r['end'])]
                 metric = metrics.get(resource['id'], {'reachable':False})
+                if metric.get('processes'):
+                    metric = {**metric,'processes':[{**p,'display':display_name(p['user'],links)} for p in metric['processes']]}
                 reservation = current[0] if current else None
                 state = classify(metric,reservation,known)
                 if len(current)>1 and metric.get('reachable'):
@@ -264,7 +300,7 @@ def create_app(mode=None, db_path=None, mapping=None):
             data = dict(mode=mode, updated_at=timestamp.isoformat(), timezone='Asia/Seoul', servers=servers,gpus=gpus,
                         reservations=sorted(reservations,key=lambda r:r['start']), errors=errors, notice=notice,
                         monitoring=monitoring, links=links,
-                        alerts=build_alerts(gpus,matched,timestamp,errors,mapping.get('users',[])))
+                        alerts=build_alerts(gpus,matched,timestamp,errors,people_names(links)))
             cache.update(at=time.monotonic(),data=data)
             viewer = session_user(request) if request is not None else None
             return {**data,'current_user':viewer or (DEMO_VIEWER if mode == 'demo' else None)}
@@ -326,7 +362,6 @@ def create_app(mode=None, db_path=None, mapping=None):
             raise HTTPException(422,'리포트 기간은 7일 또는 30일입니다.')
         timestamp = now()
         start = timestamp-timedelta(days=days)
-        users = mapping.get('users',[])
         if mode == 'demo':
             rows, report = store.list(), demo_report(mapping,days)
         elif mode == 'standalone':
@@ -343,10 +378,124 @@ def create_app(mode=None, db_path=None, mapping=None):
             except Exception as exc:
                 logger.warning('Report unavailable: %s',type(exc).__name__)
                 raise HTTPException(503,'운영 리포트를 가져오지 못했습니다.') from exc
-        summary = summarize_reservations(rows,start,timestamp,users)
+        links = account_links()
+        observed = {}
+        for linux_username, hours in (report['observed_user_hours'] or {}).items():
+            key = links.get(linux_username,{}).get('username',linux_username)
+            observed[key] = round(observed.get(key,0)+hours,1)
+        people = people_names(links)
+        summary = summarize_reservations(rows,start,timestamp,people)
         return {'mode':mode,'days':days,'generated_at':timestamp.isoformat(),'retention_days':retention,
                 'gpus':report['gpus'],'servers':report['servers'],'reservations':summary,
-                'users':merge_user_hours(summary['by_user'],report['observed_user_hours'],users)}
+                'users':merge_user_hours(summary['by_user'],observed,people)}
+
+    # --- storage, accounts, news ---------------------------------------------
+
+    @app.get('/api/storage')
+    async def storage():
+        links = account_links()
+        if mode == 'demo':
+            servers = demo_storage(mapping)
+            for server in servers:
+                for disk in server['disks']:
+                    for row in disk['users']:
+                        row['display'] = display_name(row['user'],links)
+                        row['claimed'] = row['user'] in links
+            return {'servers':servers,'mode':mode}
+        monitoring_required()
+        try:
+            servers = await prom.storage()
+        except Exception as exc:
+            logger.warning('Storage unavailable: %s',type(exc).__name__)
+            raise HTTPException(503,'저장공간 정보를 가져오지 못했습니다.') from exc
+        for server in servers:
+            for disk in server['disks']:
+                for row in disk['users']:
+                    row['display'] = display_name(row['user'],links)
+                    row['claimed'] = row['user'] in links
+        return {'servers':servers,'mode':mode}
+
+    @app.get('/api/linux-accounts')
+    async def linux_accounts(user=Depends(require_user)):
+        """Accounts seen on each workstation, so a member can claim their own."""
+        links = account_links()
+        found = {server['id']: set() for server in mapping['servers']}
+        if monitoring:
+            try:
+                for server in await prom.storage():
+                    for disk in server['disks']:
+                        found[server['id']].update(row['user'] for row in disk['users'])
+            except Exception:
+                logger.warning('Storage lookup for accounts failed')
+            try:
+                data = await snapshot()
+                for gpu in data['gpus']:
+                    for process in gpu['metrics'].get('processes') or []:
+                        found.setdefault(gpu['server'],set()).add(process['user'])
+            except Exception:
+                logger.warning('Snapshot lookup for accounts failed')
+        for linux_username, info in links.items():
+            for server in info['servers']:
+                found.setdefault(server,set()).add(linux_username)
+        rows = []
+        for server in mapping['servers']:
+            accounts = []
+            for name in sorted(found.get(server['id'],())):
+                link = links.get(name)
+                on_server = link and server['id'] in link['servers']
+                accounts.append({'linux_username':name,
+                                 'claimed_by':link['display_name'] if on_server else None,
+                                 'mine':bool(on_server and user and link['username']==user['username'])})
+            rows.append({'id':server['id'],'name':server['name'],'accounts':accounts})
+        return {'servers':rows,'me':user}
+
+    class AccountClaim(BaseModel):
+        server: str = Field(min_length=1, max_length=64)
+        linux_username: str = Field(min_length=1, max_length=64)
+
+    @app.post('/api/linux-accounts',status_code=204)
+    def claim_account(data: AccountClaim, user=Depends(require_user)):
+        if not store or not user:
+            raise HTTPException(403,'계정 연결은 로그인 후 사용할 수 있습니다.')
+        if data.server not in {s['id'] for s in mapping['servers']}:
+            raise HTTPException(422,'등록되지 않은 워크스테이션입니다.')
+        try:
+            store.claim_account(data.server,data.linux_username,user)
+        except PermissionError as exc:
+            raise HTTPException(409,str(exc)) from exc
+
+    @app.delete('/api/linux-accounts',status_code=204)
+    def release_account(server: str, linux_username: str, user=Depends(require_user)):
+        if not store or not user:
+            raise HTTPException(403,'계정 연결은 로그인 후 사용할 수 있습니다.')
+        try:
+            store.release_account(server,linux_username,user)
+        except (LookupError,PermissionError) as exc:
+            raise HTTPException(403 if isinstance(exc,PermissionError) else 404,str(exc)) from exc
+
+    @app.get('/api/news')
+    async def news():
+        try:
+            return await collect_news()
+        except Exception as exc:
+            logger.warning('News unavailable: %s',type(exc).__name__)
+            raise HTTPException(503,'뉴스를 가져오지 못했습니다. 인터넷 연결을 확인하세요.') from exc
+
+    @app.get('/api/news/image')
+    async def news_image(u: str):
+        # 외부 이미지를 포털이 대신 받아옵니다. 브라우저는 뉴스 CDN에 직접 접속하지 않습니다.
+        if not allowed_image(u):
+            raise HTTPException(400,'허용되지 않은 이미지 주소입니다.')
+        try:
+            async with httpx.AsyncClient(timeout=12,follow_redirects=True) as client:
+                upstream = await client.get(u,headers={'User-Agent':'gpu-lab-portal/1.0'})
+            upstream.raise_for_status()
+        except Exception as exc:
+            raise HTTPException(502,'이미지를 가져오지 못했습니다.') from exc
+        kind = upstream.headers.get('content-type','image/jpeg').split(';')[0]
+        if not kind.startswith('image/'):
+            raise HTTPException(415,'이미지가 아닙니다.')
+        return Response(upstream.content,media_type=kind,headers={'Cache-Control':'public, max-age=86400'})
 
     # --- reservations -------------------------------------------------------
 

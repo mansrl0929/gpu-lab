@@ -27,6 +27,9 @@ class Store:
                        'created_at TEXT NOT NULL, expires_at TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS reservations (id TEXT PRIMARY KEY, payload TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY)')
+            # 워크스테이션 로그인 계정을 포털 계정에 연결해 한 사람으로 묶습니다.
+            db.execute('CREATE TABLE IF NOT EXISTS account_links (server TEXT NOT NULL, linux_username TEXT NOT NULL, '
+                       'user_id TEXT NOT NULL, linked_at TEXT NOT NULL, PRIMARY KEY (server, linux_username))')
 
     def connect(self):
         return sqlite3.connect(self.path, timeout=10)
@@ -91,6 +94,40 @@ class Store:
         if token:
             with self.connect() as db:
                 db.execute('DELETE FROM sessions WHERE token_hash=?', (hash_token(token),))
+
+    # --- linux account links ------------------------------------------------
+    def links(self):
+        """Return {linux_username: {display_name, username, user_id, servers}}."""
+        with self.connect() as db:
+            rows = db.execute('SELECT account_links.server, account_links.linux_username, users.id, users.username, '
+                              'users.display_name FROM account_links JOIN users ON users.id = account_links.user_id').fetchall()
+        linked = {}
+        for server, linux_username, user_id, username, display_name in rows:
+            entry = linked.setdefault(linux_username, {'user_id': user_id, 'username': username,
+                                                       'display_name': display_name, 'servers': []})
+            entry['servers'].append(server)
+        return linked
+
+    def claim_account(self, server, linux_username, user):
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT user_id FROM account_links WHERE server=? AND linux_username=?',
+                             (server, linux_username)).fetchone()
+            if row and row[0] != user['id'] and user['role'] != 'admin':
+                raise PermissionError('이미 다른 사람이 연결한 계정입니다. 관리자에게 문의하세요.')
+            db.execute('INSERT OR REPLACE INTO account_links VALUES (?,?,?,?)',
+                       (server, linux_username, user['id'], _now().isoformat()))
+
+    def release_account(self, server, linux_username, user):
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT user_id FROM account_links WHERE server=? AND linux_username=?',
+                             (server, linux_username)).fetchone()
+            if not row:
+                raise LookupError('연결된 계정이 아닙니다.')
+            if row[0] != user['id'] and user['role'] != 'admin':
+                raise PermissionError('본인이 연결한 계정만 해제할 수 있습니다.')
+            db.execute('DELETE FROM account_links WHERE server=? AND linux_username=?', (server, linux_username))
 
     # --- reservations -------------------------------------------------------
     def list(self):

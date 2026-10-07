@@ -55,6 +55,9 @@ PORTAL_SIGNUP_CODE=연구실코드 uvicorn portal.app:app --host 127.0.0.1 --por
 | 예약·실사용 통합 | FREE, RESERVED_IDLE, RESERVED_IN_USE, UNRESERVED_IN_USE, BORROWED, CONFLICT, OFFLINE, UNKNOWN |
 | GPU 수치·실사용자 | `nvidia-smi` + `/proc` 읽기 전용 수집기가 node_exporter textfile로 발행 (GPU 서버에 Docker 불필요) |
 | 추이·통계 | 24시간/7일 GPU 사용률, 관측된 예약 시간·예약 중 실사용 비율·수집률 |
+| 저장공간 | 디스크별 용량과 사람별 폴더 사용량, 전체 요약 (30분 주기 측정) |
+| 계정 연결 | 워크스테이션 로그인 계정을 포털 계정에 연결해 한글 이름 하나로 통합 |
+| 연구 뉴스 | 극지·해빙 / 원격탐사 / AI 기사를 썸네일 카드로. 가로 스크롤, 창 안에서 넘겨 읽기 |
 | 운영 리포트 | 7일/30일 평균 사용률, 실사용·유휴 GPU-h, 학생별 GPU-hour, 멀티 GPU 예약 비율, CPU/RAM 포화 시간대 |
 | 알림 | 대여·조정 필요·오프라인·확인 필요·예약 종료 후 사용 지속 알림, Prometheus Offline/온도/XID/수집기 지연/대여 지속/포털 중단 규칙 |
 | 운영 배포 | NAS Compose(포털·Prometheus·Grafana·Homepage), exporter 구성, Grafana 대시보드 자동 등록 |

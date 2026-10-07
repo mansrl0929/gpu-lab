@@ -81,7 +81,7 @@ try:
      page.click('nav [data-page=reservations]')
      page.wait_for_selector('.calendar')
      page.screenshot(path=str(ARTIFACTS/'calendar-desktop.png'),full_page=True)
-     for name in ['monitoring','reports','guide','remote','overview']:
+     for name in ['monitoring','reports','storage','news','accounts','guide','remote','overview']:
          page.goto('http://127.0.0.1:8000/#'+name)
          page.wait_for_timeout(300)
          assert page.locator('#page-title').inner_text()
@@ -90,6 +90,23 @@ try:
              page.wait_for_selector('.table-scroll table tbody tr')
              assert page.get_by_role('heading',name='예약 대비 실사용',exact=False).count()==1
              page.screenshot(path=str(ARTIFACTS/'monitoring-desktop.png'),full_page=True)
+         if name=='storage':
+             page.wait_for_selector('.stack')
+             assert page.locator('.stat').count()==4, '저장공간 요약 카드'
+             page.screenshot(path=str(ARTIFACTS/'storage-desktop.png'),full_page=True)
+         if name=='news':
+             page.wait_for_selector('.news-card',timeout=25000)
+             assert page.locator('.news-row').count()>=3, '뉴스 카테고리'
+             page.wait_for_timeout(1200)
+             page.screenshot(path=str(ARTIFACTS/'news-desktop.png'),full_page=True)
+             page.locator('.news-card').first.click()
+             page.wait_for_selector('#detail-dialog[open]')
+             assert page.locator('.news-view h3').inner_text()
+             page.screenshot(path=str(ARTIFACTS/'news-modal.png'))
+             page.keyboard.press('Escape')
+         if name=='accounts':
+             page.wait_for_selector('.account-chips button',timeout=25000)
+             page.screenshot(path=str(ARTIFACTS/'accounts-desktop.png'),full_page=True)
          if name=='remote':
              assert page.locator('.code-block').count()>=6  # 접속 단계별 명령
              assert '10.174.52.127' in page.locator('#content').inner_text()

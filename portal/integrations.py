@@ -130,6 +130,41 @@ class Prometheus:
             output[r['id']] = [[t,float(v)] for t,v in row['values'] if math.isfinite(float(v)) and 0 <= float(v) <= 100] if row else []
         return output
 
+    async def storage(self):
+        """Per-disk capacity and per-user folder sizes, grouped by server."""
+        queries = {'total': 'lab_storage_total_bytes', 'used': 'lab_storage_used_bytes',
+                   'free': 'lab_storage_free_bytes', 'user': 'lab_storage_user_bytes',
+                   'ok': 'lab_storage_collector_success', 'at': 'lab_storage_collector_timestamp_seconds'}
+        async with httpx.AsyncClient(timeout=12) as client:
+            results = await asyncio.gather(*(self.query(client, q) for q in queries.values()))
+        series = dict(zip(queries, results))
+        def rows(key, server):
+            return [s for s in series[key] if s['metric'].get('server') == server]
+        def number(row):
+            value = float(row['value'][1])
+            return value if math.isfinite(value) else None
+        servers = []
+        for server in self.mapping['servers']:
+            sid = server['id']
+            sizes = {}
+            for row in rows('user', sid):
+                mount, user = row['metric'].get('mount'), row['metric'].get('user')
+                if mount and user and number(row) is not None:
+                    sizes.setdefault(mount, {})[user] = number(row)
+            disks = []
+            for row in sorted(rows('total', sid), key=lambda r: r['metric'].get('mount') or ''):
+                mount = row['metric'].get('mount')
+                used = next((number(r) for r in rows('used', sid) if r['metric'].get('mount') == mount), None)
+                free = next((number(r) for r in rows('free', sid) if r['metric'].get('mount') == mount), None)
+                people = sorted(({'user': user, 'bytes': size} for user, size in sizes.get(mount, {}).items()),
+                                key=lambda item: -item['bytes'])
+                disks.append({'mount': mount, 'total': number(row), 'used': used, 'free': free, 'users': people})
+            stamp = next((number(r) for r in rows('at', sid)), None)
+            ok = next((number(r) for r in rows('ok', sid)), None)
+            servers.append({**server, 'disks': disks, 'measured_at': stamp,
+                            'collector_ok': ok == 1 if ok is not None else None})
+        return servers
+
     async def report(self, days, tzinfo):
         """Long-window aggregates. lab_gpu_* series start when the portal is first scraped."""
         window = f'[{days}d]'
