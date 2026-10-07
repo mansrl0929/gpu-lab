@@ -241,7 +241,8 @@ def create_app(mode=None, db_path=None, mapping=None):
         rows = store.list_users()
         return {'members':[{'username':r['username'],'display_name':r['display_name'],
                             'role':r['role'] if user and user['role'] == 'admin' else None,
-                            'linux_username':linux_name(r['username'])} for r in rows]}
+                            'linux_username':linux_name(r['username'])} for r in rows],
+                'can_manage':bool(user and user['role'] == 'admin')}
 
     # --- status -------------------------------------------------------------
 
@@ -425,6 +426,15 @@ def create_app(mode=None, db_path=None, mapping=None):
                     row['display'] = display_name(row['user'],links)
                     row['claimed'] = row['user'] in links
         return {'servers':servers,'mode':mode}
+
+    @app.delete('/api/members',status_code=204)
+    def remove_member(username: str, user=Depends(require_user)):
+        if not store or not user:
+            raise HTTPException(403,'로그인이 필요합니다.')
+        try:
+            store.delete_user(username,user)
+        except (PermissionError,LookupError) as exc:
+            raise HTTPException(403 if isinstance(exc,PermissionError) else 404,str(exc)) from exc
 
     @app.get('/api/linux-accounts')
     async def linux_accounts(user=Depends(require_user)):

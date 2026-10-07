@@ -246,6 +246,16 @@ def test_standalone_without_monitoring_is_explicit(portal):
     assert portal.get('/api/reports?days=7').status_code==503
     assert 'lab_gpu_busy{' not in portal.get('/metrics').text
 
+def test_admin_removes_a_member(portal):
+    signup(portal)
+    with TestClient(portal.app) as other:
+        signup(other,username='leeseoyeon',password='lab-password-2',display_name='이서연')
+        assert other.delete('/api/members?username=kimminsu').status_code==403  # 일반 구성원은 삭제 못 함
+    assert portal.delete('/api/members?username=kimminsu').status_code==403     # 본인도 못 지움
+    assert portal.delete('/api/members?username=nobody').status_code==404
+    assert portal.delete('/api/members?username=leeseoyeon').status_code==204
+    assert [m['username'] for m in portal.get('/api/members').json()['members']]==['kimminsu']
+
 def test_members_list_hides_roles_from_members(portal):
     signup(portal)
     with TestClient(portal.app) as other:

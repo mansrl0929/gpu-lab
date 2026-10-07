@@ -71,6 +71,22 @@ class Store:
             db.execute('UPDATE users SET password_hash=? WHERE id=?', (hash_password(password), user_id))
             db.execute('DELETE FROM sessions WHERE user_id=?', (user_id,))  # Other devices must sign in again.
 
+    def delete_user(self, username, actor):
+        """Remove a member and everything that identifies them. Reservations are kept."""
+        username = normalize_username(username)
+        if actor['role'] != 'admin':
+            raise PermissionError('관리자만 구성원을 삭제할 수 있습니다.')
+        if username == actor['username']:
+            raise PermissionError('본인 계정은 삭제할 수 없습니다.')
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT id FROM users WHERE username=?', (username,)).fetchone()
+            if not row:
+                raise LookupError('그런 구성원이 없습니다.')
+            db.execute('DELETE FROM sessions WHERE user_id=?', (row[0],))
+            db.execute('DELETE FROM account_links WHERE user_id=?', (row[0],))
+            db.execute('DELETE FROM users WHERE id=?', (row[0],))
+
     # --- sessions -----------------------------------------------------------
     def start_session(self, user_id):
         token = new_session_token()
