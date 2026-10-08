@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 import httpx
 import yaml
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from starlette.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -581,9 +581,22 @@ def create_app(mode=None, db_path=None, mapping=None):
 
     app.mount('/static',StaticFiles(directory=ROOT/'portal/static'),name='static')
 
-    @app.get('/')
+    static_dir = ROOT/'portal/static'
+    page = {'stamp': None, 'html': ''}
+
+    def asset_version():
+        # 파일이 바뀌면 주소도 바뀌게 해서, 브라우저가 옛 스크립트를 쓰는 일이 없게 합니다.
+        return '-'.join(str(int((static_dir/name).stat().st_mtime)) for name in ('app.js','style.css'))
+
+    @app.get('/',response_class=HTMLResponse)
     def index():
-        return FileResponse(ROOT/'portal/static/index.html')
+        version = asset_version()
+        if page['stamp'] != version:
+            html = (static_dir/'index.html').read_text(encoding='utf-8')
+            for asset in ('app.js','style.css'):
+                html = html.replace(f'/static/{asset}',f'/static/{asset}?v={version}')
+            page.update(stamp=version,html=html)
+        return HTMLResponse(page['html'],headers={'Cache-Control':'no-cache'})
     return app
 
 app = create_app()
